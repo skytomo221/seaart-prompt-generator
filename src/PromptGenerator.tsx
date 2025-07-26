@@ -96,18 +96,17 @@ function PromptGenerator({ index, data, selectedKeywordNames, setSelectedKeyword
                     keywordName={keywordName}
                     keywords={data.keywords}
                     onkeywordNameChange={(keywordName) => {
+                      if (keywordName === "削除する") {
+                        const newKeywords = [...selectedKeywordNames];
+                        newKeywords.splice(index, 1);
+                        setSelectedKeywordNames(newKeywords);
+                        return;
+                      }
                       const newKeywords = [...selectedKeywordNames];
                       newKeywords[index] = keywordName ?? "";
                       setSelectedKeywordNames(newKeywords);
                     }}
                   />
-                  <IconButton aria-label="delete" onClick={() => {
-                    const newKeywords = [...selectedKeywordNames];
-                    newKeywords.splice(index, 1);
-                    setSelectedKeywordNames(newKeywords);
-                  }}>
-                    <DeleteIcon />
-                  </IconButton>
                 </div>
               ))
             }
