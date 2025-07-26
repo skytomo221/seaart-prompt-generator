@@ -9,6 +9,7 @@ import CardContent from '@mui/material/CardContent';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import KeywordSelect from "./KeywordSelect";
+import ResultText from "./ResultText";
 
 function App() {
   const [message, setMessage] = useState("");
@@ -105,14 +106,14 @@ function App() {
                 <Button id="add-keyword" variant="outlined" startIcon={<AddIcon />} sx={{ width: "100%" }} onClick={addKeyword}>キーワードを追加する</Button>
               </CardActions>
             </div>
-            <Typography variant="body1" component="h2">生成されたプロンプト</Typography>
-            <pre id="prompt-output">
-              {getPrompts()}
-            </pre>
-            <Typography variant="body1" component="h2">生成されたネガティブプロンプト</Typography>
-            <pre id="negative-prompt-output">
-              {getNegativePrompts()}
-            </pre>
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="body1" component="h2">生成されたプロンプト</Typography>
+              <ResultText text={getPrompts()} />
+            </Box>
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="body1" component="h2">生成されたネガティブプロンプト</Typography>
+              <ResultText text={getNegativePrompts()} />
+            </Box>
           </CardContent>
         </Card>
       </Box>
