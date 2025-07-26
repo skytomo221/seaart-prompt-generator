@@ -28,11 +28,6 @@ function renderKeywordName(keywordName: string) {
 export default function KeywordSelect({ keywordName, keywords, onkeywordNameChange, }: KeywordSelectProps) {
   const [inputValue, setInputValue] = React.useState('');
 
-  React.useEffect(() => {
-    if (onkeywordNameChange) {
-      onkeywordNameChange(keywordName);
-    }
-  }, [keywordName, onkeywordNameChange]);
   return (
     <Autocomplete
       value={keywordName}
