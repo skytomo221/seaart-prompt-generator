@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Data, Keyword } from "./data";
 import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
@@ -10,6 +11,7 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import KeywordSelect from "./KeywordSelect";
 import ResultText from "./ResultText";
+import IconButton from "@mui/material/IconButton";
 
 function App() {
   const [message, setMessage] = useState("");
@@ -89,7 +91,7 @@ function App() {
               <div id="keywords"></div>
               {
                 selectedKeywordNames.map((keywordName, index) => (
-                  <div key={keywordName + index} className="keyword-input">
+                  <div key={keywordName + index} className="keyword-input" style={{ display: "flex", alignItems: "center" }}>
                     <KeywordSelect
                       keywordName={keywordName}
                       keywords={data.keywords}
@@ -99,6 +101,13 @@ function App() {
                         setSelectedKeywordNames(newKeywords);
                       }}
                     />
+                    <IconButton aria-label="delete" onClick={() => {
+                      const newKeywords = [...selectedKeywordNames];
+                      newKeywords.splice(index, 1);
+                      setSelectedKeywordNames(newKeywords);
+                    }}>
+                      <DeleteIcon />
+                    </IconButton>
                   </div>
                 ))
               }

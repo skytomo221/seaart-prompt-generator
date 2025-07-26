@@ -24,6 +24,8 @@ export default function KeywordSelect({ keywordName, keywords, onkeywordNameChan
       value={keywordName}
       inputValue={inputValue}
       disableClearable
+      fullWidth
+      size="small"
       onChange={(_, newKeywordName: string | null) => {
         if (onkeywordNameChange) {
           onkeywordNameChange(newKeywordName ?? defaultKeywordName);
