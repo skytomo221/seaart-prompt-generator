@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Data, Keyword } from "./data";
+import AddIcon from '@mui/icons-material/Add';
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardActions from '@mui/material/CardActions';
+import CardContent from '@mui/material/CardContent';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
+import KeywordSelect from "./KeywordSelect";
 
 function App() {
   const [message, setMessage] = useState("");
@@ -67,42 +75,47 @@ function App() {
 
   return (
     <div style={{ padding: "1em" }}>
-      <h1>SeaArt Prompt Generator</h1>
+      <Typography variant="h3" component="h1">SeaArt Prompt Generator</Typography>
       <div>{message}</div>
-      <h2>プロンプト生成</h2>
-      <div>
-        <div id="keywords"></div>
-        {
-          selectedKeywordNames.map((keyword, index) => (
-            <div key={index} className="keyword-input">
-              <select
-                value={keyword}
-                onChange={(e) => {
-                  const newKeywords = [...selectedKeywordNames];
-                  newKeywords[index] = e.target.value;
-                  setSelectedKeywordNames(newKeywords);
-                }}
-              >
-                <option value="">空白</option>
-                {data.keywords.map((kw, i) => (
-                  <option key={i} value={kw.name}>
-                    {kw.name}
-                  </option>
-                ))}
-              </select>
+      <Box
+        component="span"
+        sx={{ display: 'inline-block', mx: '2px' }}
+      >
+        <Card sx={{ minWidth: 275 }}>
+          <CardContent>
+            <Typography variant="body1" component="h2">プロンプト生成</Typography>
+            <div>
+              <div id="keywords"></div>
+              {
+                selectedKeywordNames.map((keywordName, index) => (
+                  <div key={keywordName + index} className="keyword-input">
+                    <KeywordSelect
+                      keywordName={keywordName}
+                      keywords={data.keywords}
+                      onkeywordNameChange={(keywordName) => {
+                        const newKeywords = [...selectedKeywordNames];
+                        newKeywords[index] = keywordName ?? "";
+                        setSelectedKeywordNames(newKeywords);
+                      }}
+                    />
+                  </div>
+                ))
+              }
+              <CardActions>
+                <Button id="add-keyword" variant="outlined" startIcon={<AddIcon />} sx={{ width: "100%" }} onClick={addKeyword}>キーワードを追加する</Button>
+              </CardActions>
             </div>
-          ))
-        }
-        <button id="add-keyword" onClick={addKeyword}>キーワードを追加する</button>
-      </div>
-      <h2>生成されたプロンプト</h2>
-      <pre id="prompt-output">
-        {getPrompts()}
-      </pre>
-      <h2>生成されたネガティブプロンプト</h2>
-      <pre id="negative-prompt-output">
-        {getNegativePrompts()}
-      </pre>
+            <Typography variant="body1" component="h2">生成されたプロンプト</Typography>
+            <pre id="prompt-output">
+              {getPrompts()}
+            </pre>
+            <Typography variant="body1" component="h2">生成されたネガティブプロンプト</Typography>
+            <pre id="negative-prompt-output">
+              {getNegativePrompts()}
+            </pre>
+          </CardContent>
+        </Card>
+      </Box>
     </div>
   );
 }
