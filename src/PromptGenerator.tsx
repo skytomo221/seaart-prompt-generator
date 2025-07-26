@@ -19,11 +19,12 @@ interface PromptGeneratorProps {
   data: Data;
   selectedKeywordNames: string[];
   setSelectedKeywordNames: React.Dispatch<React.SetStateAction<string[]>>;
+  onClickDelete?: () => void;
   onClickCopyToLeft?: () => void;
   onClickCopyToRight?: () => void;
 }
 
-function PromptGenerator({ index, data, selectedKeywordNames, setSelectedKeywordNames, onClickCopyToLeft, onClickCopyToRight }: PromptGeneratorProps) {
+function PromptGenerator({ index, data, selectedKeywordNames, setSelectedKeywordNames, onClickDelete, onClickCopyToLeft, onClickCopyToRight }: PromptGeneratorProps) {
   function addKeyword() {
     setSelectedKeywordNames((prev) => [...prev, ""]);
   }
@@ -75,10 +76,15 @@ function PromptGenerator({ index, data, selectedKeywordNames, setSelectedKeyword
       <Card sx={{ minWidth: 275 }}>
         <CardContent>
           <Box sx={{ display: 'flex' }}>
-            <Box style={{ flexGrow: 1 }} />
             <Typography variant="h6" component="h2" sx={{ color: 'text.secondary' }}>
               #{index + 1}
             </Typography>
+            <Box style={{ flexGrow: 1 }} />
+            <Tooltip title="プロンプトを削除する">
+              <IconButton aria-label="delete" onClick={onClickDelete}>
+                <DeleteIcon />
+              </IconButton>
+            </Tooltip>
           </Box>
           <Typography variant="body1" component="h3">プロンプト生成</Typography>
           <div>

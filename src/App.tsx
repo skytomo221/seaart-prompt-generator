@@ -51,6 +51,13 @@ function App() {
                     return updated;
                   });
                 }}
+                onClickDelete={() => {
+                  setPromptGenerators((prev) => {
+                    const updated = [...prev];
+                    updated.splice(index, 1);
+                    return updated;
+                  });
+                }}
                 onClickCopyToLeft={() => {
                   setPromptGenerators((prev) => {
                     const updated = [...prev];
