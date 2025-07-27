@@ -5,9 +5,15 @@ import Typography from '@mui/material/Typography';
 import PromptGenerator from "./PromptGenerator";
 import Box from "@mui/material/Box";
 import Stack from '@mui/material/Stack';
+import { v4 as uuidv4 } from "uuid";
+
+type SelectedKeywordName = {
+  id: string;
+  name: string;
+}
 
 type PromptGenerator = {
-  selectedKeywordNames: string[];
+  selectedKeywordNames: SelectedKeywordName[];
 }
 
 function App() {
@@ -17,7 +23,7 @@ function App() {
     keywords: [],
     defaults: [],
   });
-  const [promptGenerators, setPromptGenerators] = useState<PromptGenerator[]>([{ selectedKeywordNames: Array(8).fill("空白") }]);
+  const [promptGenerators, setPromptGenerators] = useState<PromptGenerator[]>([{ selectedKeywordNames: Array(8).fill({ name: "空白", }).map((v) => ({ id: uuidv4(), ...v })) }]);
 
   useEffect(() => {
     invoke("load_config")
@@ -36,7 +42,7 @@ function App() {
       <Box sx={{ my: 2, display: "flex" }}>
         {
           promptGenerators.map((pg, index) => (
-            <Stack key={index} direction="row">
+            <Stack key={`prompt-${index}`} direction="row">
               <PromptGenerator
                 index={index}
                 data={data}

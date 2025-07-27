@@ -27,6 +27,9 @@ function renderKeywordName(keywordName: string) {
 
 export default function KeywordSelect({ keywordName, keywords, onkeywordNameChange, }: KeywordSelectProps) {
   const [inputValue, setInputValue] = React.useState('');
+  const keywordNames = ["削除する", "空白"]
+    .concat(keywords.map((k) => k.name))
+    .filter((v, i, arr) => v !== "" && arr.indexOf(v) === i);
 
   return (
     <Autocomplete
@@ -43,7 +46,7 @@ export default function KeywordSelect({ keywordName, keywords, onkeywordNameChan
       onInputChange={(_, newInputValue) => {
         setInputValue(newInputValue);
       }}
-      options={["削除する", "空白"].concat(keywords.map((k) => k.name))}
+      options={keywordNames}
       renderOption={(props, option) => {
         const { key, ...optionProps } = props;
         return (
