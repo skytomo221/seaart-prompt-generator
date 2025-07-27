@@ -67,14 +67,20 @@ function App() {
                 onClickCopyToLeft={() => {
                   setPromptGenerators((prev) => {
                     const updated = [...prev];
-                    updated.splice(index, 0, { selectedKeywordNames: pg.selectedKeywordNames });
+                    updated.splice(index, 0, {
+                      selectedKeywordNames: pg.selectedKeywordNames.map(k => ({
+                        ...k, id: uuidv4()
+                      })),
+                    });
                     return updated;
                   });
                 }}
                 onClickCopyToRight={() => {
                   setPromptGenerators((prev) => {
                     const updated = [...prev];
-                    updated.splice(index + 1, 0, { selectedKeywordNames: pg.selectedKeywordNames });
+                    updated.splice(index + 1, 0, {
+                      selectedKeywordNames: pg.selectedKeywordNames.map(k => ({ ...k, id: uuidv4() })),
+                    });
                     return updated;
                   });
                 }}
