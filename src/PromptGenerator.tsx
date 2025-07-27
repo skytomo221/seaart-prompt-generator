@@ -54,8 +54,10 @@ function SortableKeyword({
   };
 
   return (
-    <Box ref={setNodeRef} style={style} {...attributes} sx={{ display: "flex", alignItems: "center", mb: 1, cursor: "grab" }}>
-      <Box {...listeners}><DragHandleIcon /></Box>
+    <Box ref={setNodeRef} style={style} {...attributes} sx={{ display: "flex", alignItems: "center", ml: -1.5, mb: 1, cursor: "grab" }}>
+      <IconButton {...listeners} disableRipple sx={{ cursor: "grab" }}>
+        <DragHandleIcon />
+      </IconButton>
       <KeywordSelect
         keywordName={keywordName}
         keywords={keywords}
