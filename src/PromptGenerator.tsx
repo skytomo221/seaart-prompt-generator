@@ -63,14 +63,15 @@ function InsertButton({ onClick }: { onClick: () => void }) {
         sx={{
           height: "3px",
           opacity: visible ? 1 : 0,
-          backgroundColor: "divider",
+          backgroundColor: "success.main",
         }}
       />
 
       {visible && (
-        <IconButton
+        <Button
           onClick={onClick}
           color="success"
+          variant="contained"
           sx={{
             position: "absolute",
             left: "50%",
@@ -81,7 +82,7 @@ function InsertButton({ onClick }: { onClick: () => void }) {
           }}
         >
           <AddIcon />
-        </IconButton>
+        </Button>
       )}
     </Box>
   );
