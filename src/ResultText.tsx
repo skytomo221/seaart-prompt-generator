@@ -21,7 +21,7 @@ export default function ResultText({ text }: ResultTextProps) {
   };
 
   const handleCloseSnackbar = (
-    event?: React.SyntheticEvent | Event,
+    _?: React.SyntheticEvent | Event,
     reason?: string
   ) => {
     if (reason === 'clickaway') {

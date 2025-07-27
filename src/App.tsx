@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Data } from "./data";
-import Typography from '@mui/material/Typography';
 import PromptGenerator from "./PromptGenerator";
 import Box from "@mui/material/Box";
 import Stack from '@mui/material/Stack';
