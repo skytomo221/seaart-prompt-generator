@@ -31,6 +31,61 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { v4 as uuidv4 } from "uuid";
+import { Fragment } from "react/jsx-runtime";
+import { useRef, useState } from "react";
+
+function InsertButton({ onClick }: { onClick: () => void }) {
+  const [visible, setVisible] = useState(false);
+  const timeoutRef = useRef<number | undefined>();
+
+  const handleMouseEnter = () => {
+    timeoutRef.current = window.setTimeout(() => {
+      setVisible(true);
+    }, 300);
+  };
+
+  const handleMouseLeave = () => {
+    clearTimeout(timeoutRef.current);
+    setVisible(false);
+  };
+
+  return (
+    <Box
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      sx={{
+        position: "relative",
+        height: 12,
+        my: -0.8,
+      }}
+    >
+      <Box
+        sx={{
+          height: "3px",
+          opacity: visible ? 1 : 0,
+          backgroundColor: "divider",
+        }}
+      />
+
+      {visible && (
+        <IconButton
+          onClick={onClick}
+          color="success"
+          sx={{
+            position: "absolute",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            border: "1px solid",
+            transition: "opacity 0.2s ease",
+            opacity: visible ? 1 : 0,
+          }}
+        >
+          <AddIcon />
+        </IconButton>
+      )}
+    </Box>
+  );
+}
 
 function SortableKeyword({
   id,
@@ -85,6 +140,14 @@ interface PromptGeneratorProps {
 function PromptGenerator({ index, data, selectedKeywordNames, setSelectedKeywordNames, onClickDelete, onClickCopyToLeft, onClickCopyToRight }: PromptGeneratorProps) {
   function addKeyword() {
     setSelectedKeywordNames((prev) => [...prev, { id: uuidv4(), name: "空白" }]);
+  }
+
+  function insertKeywordAt(index: number) {
+    setSelectedKeywordNames((prev) => {
+      const newKeyword = { id: uuidv4(), name: "空白" };
+      const newArray = [...prev.slice(0, index), newKeyword, ...prev.slice(index)];
+      return newArray;
+    });
   }
 
   function mergeDefaults(selectedKeywords: Keyword[]): Keyword[] {
@@ -162,27 +225,30 @@ function PromptGenerator({ index, data, selectedKeywordNames, setSelectedKeyword
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={selectedKeywordNames.map((keywordName) => keywordName.id)} strategy={verticalListSortingStrategy}>
                 {selectedKeywordNames.map((keywordName, i) => (
-                  <SortableKeyword
-                    key={keywordName.id}
-                    id={keywordName.id}
-                    index={i}
-                    keywordName={keywordName.name}
-                    onKeywordChange={(newName) => {
-                      if (newName === "削除する") {
+                  <Fragment key={keywordName.id}>
+                    <InsertButton onClick={() => insertKeywordAt(i)} />
+                    <SortableKeyword
+                      key={keywordName.id}
+                      id={keywordName.id}
+                      index={i}
+                      keywordName={keywordName.name}
+                      onKeywordChange={(newName) => {
+                        if (newName === "削除する") {
+                          setSelectedKeywordNames((prev) => prev.filter((_, idx) => idx !== i));
+                        } else {
+                          setSelectedKeywordNames((prev) =>
+                            prev.map((item, idx) =>
+                              idx === i ? { ...item, name: newName ?? "空白" } : item
+                            )
+                          );
+                        }
+                      }}
+                      onKeywordDelete={() => {
                         setSelectedKeywordNames((prev) => prev.filter((_, idx) => idx !== i));
-                      } else {
-                        setSelectedKeywordNames((prev) =>
-                          prev.map((item, idx) =>
-                            idx === i ? { ...item, name: newName ?? "空白" } : item
-                          )
-                        );
-                      }
-                    }}
-                    onKeywordDelete={() => {
-                      setSelectedKeywordNames((prev) => prev.filter((_, idx) => idx !== i));
-                    }}
-                    keywords={data.keywords}
-                  />
+                      }}
+                      keywords={data.keywords}
+                    />
+                  </Fragment>
                 ))}
               </SortableContext>
             </DndContext>
