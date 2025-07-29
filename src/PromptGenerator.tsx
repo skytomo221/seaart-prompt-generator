@@ -153,10 +153,8 @@ function PromptGenerator({ index, data, selectedKeywordNames, setSelectedKeyword
   function mergeDefaults(selectedKeywords: Keyword[]): Keyword[] {
     let mergedKeywords: Keyword[] = [];
     selectedKeywords.forEach((s) => {
-      if (s.type !== data.characterTypeName) {
-        mergedKeywords.push(s);
-        return;
-      };
+      mergedKeywords.push(s);
+      if (s.type !== data.characterTypeName) return;
       const def = data.defaults.find((d) => d.character === s.name);
       if (!def) return;
       def.parts.forEach((part) => {
