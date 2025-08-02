@@ -32,6 +32,10 @@ import { CSS } from "@dnd-kit/utilities";
 import { v4 as uuidv4 } from "uuid";
 import { Fragment } from "react/jsx-runtime";
 import { useRef, useState } from "react";
+import { useKeywordsStore } from "./contexts/keywordsContext";
+import { useDefaultCharactersStore } from "./contexts/defaultsContext";
+import { usePromptGeneratorsStore, usePromptGeneratorsDispatch } from "./contexts/promptGeneratorsContext";
+import { useCharacterTypeNameStore } from "./contexts/characterTypeNameContext";
 
 function InsertButton({ onClick }: { onClick: () => void }) {
   const [visible, setVisible] = useState(false);
@@ -88,20 +92,14 @@ function InsertButton({ onClick }: { onClick: () => void }) {
 }
 
 function SortableKeyword({
-  id,
-  keywordName,
-  onKeywordChange,
-  keywords,
+  index,
+  keywordIndex,
 }: {
-  id: string;
   index: number;
-  keywordName: string;
-  onKeywordChange: (value: string | null) => void;
-  onKeywordDelete: () => void;
-  keywords: Keyword[];
+  keywordIndex: number;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id });
+    useSortable({ id: `${index}-${keywordIndex}` });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -113,40 +111,43 @@ function SortableKeyword({
       <IconButton {...listeners} disableRipple sx={{ cursor: "grab" }}>
         <DragHandleIcon />
       </IconButton>
-      <KeywordSelect
-        keywordName={keywordName}
-        keywords={keywords}
-        onkeywordNameChange={onKeywordChange}
-      />
+      <KeywordSelect index={index} keywordIndex={keywordIndex} />
     </Box>
   );
 }
 
-type SelectedKeywordName = {
-  id: string;
-  name: string;
-}
-
 interface PromptGeneratorProps {
   index: number;
-  data: Data;
-  selectedKeywordNames: SelectedKeywordName[];
-  setSelectedKeywordNames: React.Dispatch<React.SetStateAction<SelectedKeywordName[]>>;
-  onClickDelete?: () => void;
-  onClickCopyToLeft?: () => void;
-  onClickCopyToRight?: () => void;
 }
 
-function PromptGenerator({ index, data, selectedKeywordNames, setSelectedKeywordNames, onClickDelete, onClickCopyToLeft, onClickCopyToRight }: PromptGeneratorProps) {
+function PromptGenerator({ index }: PromptGeneratorProps) {
+  const keywords = useKeywordsStore();
+  const defaultCharacters = useDefaultCharactersStore();
+  const promptGenerators = usePromptGeneratorsStore();
+  const promptGeneratorsDispatch = usePromptGeneratorsDispatch();
+  const characterTypeName = useCharacterTypeNameStore();
+
+  const sensors = useSensors(useSensor(PointerSensor));
+
+  const pg = promptGenerators[index];
+  if (!pg) return null;
+
   function addKeyword() {
-    setSelectedKeywordNames((prev) => [...prev, { id: uuidv4(), name: "空白" }]);
+    const updated = [...pg.selectedKeywordNames, { id: uuidv4(), name: "空白" }];
+    promptGeneratorsDispatch({
+      type: "UPDATE_PROMPT_GENERATOR",
+      index,
+      payload: { ...pg, selectedKeywordNames: updated }
+    });
   }
 
-  function insertKeywordAt(index: number) {
-    setSelectedKeywordNames((prev) => {
-      const newKeyword = { id: uuidv4(), name: "空白" };
-      const newArray = [...prev.slice(0, index), newKeyword, ...prev.slice(index)];
-      return newArray;
+  function insertKeywordAt(idx: number) {
+    const newKeyword = { id: uuidv4(), name: "空白" };
+    const updated = [...pg.selectedKeywordNames.slice(0, idx), newKeyword, ...pg.selectedKeywordNames.slice(idx)];
+    promptGeneratorsDispatch({
+      type: "UPDATE_PROMPT_GENERATOR",
+      index,
+      payload: { ...pg, selectedKeywordNames: updated }
     });
   }
 
@@ -154,8 +155,8 @@ function PromptGenerator({ index, data, selectedKeywordNames, setSelectedKeyword
     let mergedKeywords: Keyword[] = [];
     selectedKeywords.forEach((s) => {
       mergedKeywords.push(s);
-      if (s.type !== data.characterTypeName) return;
-      const def = data.defaults.find((d) => d.character === s.name);
+      if (s.type !== characterTypeName) return;
+      const def = defaultCharacters.find((d) => d.character === s.name);
       if (!def) return;
       def.parts.forEach((part) => {
         const alreadySelected = selectedKeywords.some((sel) => sel.type === part.type);
@@ -168,8 +169,8 @@ function PromptGenerator({ index, data, selectedKeywordNames, setSelectedKeyword
   }
 
   function collectSelectedKeywords(): Keyword[] {
-    const selectedKeywords = selectedKeywordNames.map((selectedKeywordName) =>
-      data.keywords.find((k) => k.name === selectedKeywordName.name)
+    const selectedKeywords = pg.selectedKeywordNames.map((selectedKeywordName) =>
+      keywords.find((k) => k.name === selectedKeywordName.name)
     ).filter((k): k is Keyword => !!k);
     return mergeDefaults(selectedKeywords);
   }
@@ -187,23 +188,22 @@ function PromptGenerator({ index, data, selectedKeywordNames, setSelectedKeyword
       .join(",");
   }
 
-  const sensors = useSensors(useSensor(PointerSensor));
-
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-
-    const oldIndex = selectedKeywordNames.findIndex((item) => item.id === active.id);
-    const newIndex = selectedKeywordNames.findIndex((item) => item.id === over.id);
-    const newArray = arrayMove(selectedKeywordNames, oldIndex, newIndex);
-    setSelectedKeywordNames(newArray);
+    const oldIndex = pg.selectedKeywordNames.findIndex((item) => `${index}-${item.id}` === active.id);
+    const newIndex = pg.selectedKeywordNames.findIndex((item) => `${index}-${item.id}` === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const newArray = arrayMove(pg.selectedKeywordNames, oldIndex, newIndex);
+    promptGeneratorsDispatch({
+      type: "UPDATE_PROMPT_GENERATOR",
+      index,
+      payload: { ...pg, selectedKeywordNames: newArray }
+    });
   }
 
   return (
-    <Box
-      component="span"
-      sx={{ display: 'inline-block', mx: '2px' }}
-    >
+    <Box component="span" sx={{ display: 'inline-block', mx: '2px' }}>
       <Card sx={{ minWidth: 275 }}>
         <CardContent>
           <Box sx={{ display: 'flex' }}>
@@ -212,7 +212,7 @@ function PromptGenerator({ index, data, selectedKeywordNames, setSelectedKeyword
             </Typography>
             <Box style={{ flexGrow: 1 }} />
             <Tooltip title="プロンプトを削除する">
-              <IconButton aria-label="delete" onClick={onClickDelete}>
+              <IconButton aria-label="delete" onClick={() => promptGeneratorsDispatch({ type: "REMOVE_PROMPT_GENERATOR", index })}>
                 <DeleteIcon />
               </IconButton>
             </Tooltip>
@@ -221,30 +221,13 @@ function PromptGenerator({ index, data, selectedKeywordNames, setSelectedKeyword
           <div>
             <div id="keywords"></div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={selectedKeywordNames.map((keywordName) => keywordName.id)} strategy={verticalListSortingStrategy}>
-                {selectedKeywordNames.map((keywordName, i) => (
+              <SortableContext items={pg.selectedKeywordNames.map((keywordName) => `${index}-${keywordName.id}`)} strategy={verticalListSortingStrategy}>
+                {pg.selectedKeywordNames.map((keywordName, i) => (
                   <Fragment key={keywordName.id}>
                     <InsertButton onClick={() => insertKeywordAt(i)} />
                     <SortableKeyword
-                      key={keywordName.id}
-                      id={keywordName.id}
-                      index={i}
-                      keywordName={keywordName.name}
-                      onKeywordChange={(newName) => {
-                        if (newName === "削除する") {
-                          setSelectedKeywordNames((prev) => prev.filter((_, idx) => idx !== i));
-                        } else {
-                          setSelectedKeywordNames((prev) =>
-                            prev.map((item, idx) =>
-                              idx === i ? { ...item, name: newName ?? "空白" } : item
-                            )
-                          );
-                        }
-                      }}
-                      onKeywordDelete={() => {
-                        setSelectedKeywordNames((prev) => prev.filter((_, idx) => idx !== i));
-                      }}
-                      keywords={data.keywords}
+                      index={index}
+                      keywordIndex={i}
                     />
                   </Fragment>
                 ))}
@@ -265,13 +248,25 @@ function PromptGenerator({ index, data, selectedKeywordNames, setSelectedKeyword
         </CardContent>
         <CardActions>
           <Tooltip title="左にコピーする">
-            <IconButton onClick={onClickCopyToLeft}>
+            <IconButton onClick={() => {
+              const newPromptGenerator = {
+                id: uuidv4(),
+                selectedKeywordNames: pg.selectedKeywordNames.map(k => ({ ...k, id: uuidv4() })),
+              };
+              promptGeneratorsDispatch({ type: "ADD_PROMPT_GENERATOR", index, payload: newPromptGenerator });
+            }}>
               <ForkLeftIcon />
             </IconButton>
           </Tooltip>
           <Box style={{ flexGrow: 1 }} />
           <Tooltip title="右にコピーする">
-            <IconButton onClick={onClickCopyToRight}>
+            <IconButton onClick={() => {
+              const newPromptGenerator = {
+                id: uuidv4(),
+                selectedKeywordNames: pg.selectedKeywordNames.map(k => ({ ...k, id: uuidv4() })),
+              };
+              promptGeneratorsDispatch({ type: "ADD_PROMPT_GENERATOR", index: index + 1, payload: newPromptGenerator });
+            }}>
               <ForkRightIcon />
             </IconButton>
           </Tooltip>

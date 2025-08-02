@@ -5,44 +5,30 @@ import PromptGenerator from "./PromptGenerator";
 import Box from "@mui/material/Box";
 import Stack from '@mui/material/Stack';
 import { motion, AnimatePresence } from "framer-motion";
-import { v4 as uuidv4 } from "uuid";
+import { KeywordsProvider, useKeywordsDispatch, useKeywordsStore } from "./contexts/keywordsContext";
+import { DefaultCharactersProvider, useDefaultCharactersDispatch } from "./contexts/defaultsContext";
+import { PromptGeneratorsProvider, usePromptGeneratorsStore, usePromptGeneratorsDispatch } from "./contexts/promptGeneratorsContext";
+import { CharacterTypeNameProvider } from "./contexts/characterTypeNameContext";
 
-type SelectedKeywordName = {
-  id: string;
-  name: string;
-}
-
-type PromptGenerator = {
-  id: string;
-  selectedKeywordNames: SelectedKeywordName[];
-}
-
-function App() {
+function AppContent() {
   const [message, setMessage] = useState("");
-  const [data, setData] = useState<Data>({
-    characterTypeName: "",
-    keywords: [],
-    defaults: [],
-  });
-  const [promptGenerators, setPromptGenerators] = useState<PromptGenerator[]>(
-    [
-      {
-        id: uuidv4(),
-        selectedKeywordNames: Array(8).fill({ name: "空白", }).map((v) => ({ id: uuidv4(), ...v }))
-      }
-    ]
-  );
+
+  const keywordsDispatch = useKeywordsDispatch();
+  const defaultCharactersDispatch = useDefaultCharactersDispatch();
+  const promptGenerators = usePromptGeneratorsStore();
+  const promptGeneratorsDispatch = usePromptGeneratorsDispatch();
 
   useEffect(() => {
     invoke("load_config")
       .then((res) => {
         const data = res as Data;
-        setData(data);
+        keywordsDispatch({ type: "SET_KEYWORDS", payload: data.keywords });
+        defaultCharactersDispatch({ type: "SET_DEFAULT_CHARACTERS", payload: data.defaults });
       })
       .catch((err) => {
         setMessage(String(err));
       });
-  }, []);
+  }, [keywordsDispatch, defaultCharactersDispatch, promptGenerators.length, promptGeneratorsDispatch]);
 
   return (
     <div style={{ padding: "1em" }}>
@@ -59,54 +45,27 @@ function App() {
               transition={{ duration: 0.2 }}
             >
               <Stack direction="row">
-                <PromptGenerator
-                  index={index}
-                  data={data}
-                  selectedKeywordNames={pg.selectedKeywordNames}
-                  setSelectedKeywordNames={(updatedKeywordNames) => {
-                    setPromptGenerators((prev) => {
-                      const updated = [...prev];
-                      const current = updated[index].selectedKeywordNames;
-                      const resolved =
-                        typeof updatedKeywordNames === "function" ? updatedKeywordNames(current) : updatedKeywordNames;
-                      updated[index] = { ...updated[index], selectedKeywordNames: resolved, };
-                      return updated;
-                    });
-                  }}
-                  onClickDelete={() => {
-                    setPromptGenerators((prev) => {
-                      const updated = [...prev];
-                      updated.splice(index, 1);
-                      return updated;
-                    });
-                  }}
-                  onClickCopyToLeft={() => {
-                    setPromptGenerators((prev) => {
-                      const updated = [...prev];
-                      updated.splice(index, 0, {
-                        id: uuidv4(),
-                        selectedKeywordNames: pg.selectedKeywordNames.map(k => ({ ...k, id: uuidv4() })),
-                      });
-                      return updated;
-                    });
-                  }}
-                  onClickCopyToRight={() => {
-                    setPromptGenerators((prev) => {
-                      const updated = [...prev];
-                      updated.splice(index + 1, 0, {
-                        id: uuidv4(),
-                        selectedKeywordNames: pg.selectedKeywordNames.map(k => ({ ...k, id: uuidv4() })),
-                      });
-                      return updated;
-                    });
-                  }}
-                />
+                <PromptGenerator index={index} />
               </Stack>
             </motion.div>
           ))}
         </AnimatePresence>
       </Box>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <KeywordsProvider>
+      <DefaultCharactersProvider>
+        <PromptGeneratorsProvider>
+          <CharacterTypeNameProvider>
+            <AppContent />
+          </CharacterTypeNameProvider>
+        </PromptGeneratorsProvider>
+      </DefaultCharactersProvider>
+    </KeywordsProvider>
   );
 }
 

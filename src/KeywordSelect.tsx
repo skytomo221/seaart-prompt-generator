@@ -1,17 +1,12 @@
 import * as React from 'react';
 import TextField from '@mui/material/TextField';
 import Autocomplete from '@mui/material/Autocomplete';
-import { Keyword } from './data';
 import Box from '@mui/material/Box';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SpaceBarIcon from '@mui/icons-material/SpaceBar';
 import Typography from '@mui/material/Typography';
-
-interface KeywordSelectProps {
-  keywordName: string;
-  keywords: Keyword[];
-  onkeywordNameChange?: (keywordName: string) => void;
-}
+import { useKeywordsStore } from './contexts/keywordsContext';
+import { usePromptGeneratorsStore, usePromptGeneratorsDispatch } from './contexts/promptGeneratorsContext';
 
 const defaultKeywordName = "空白";
 
@@ -25,8 +20,29 @@ function renderKeywordName(keywordName: string) {
   return keywordName;
 }
 
-export default function KeywordSelect({ keywordName, keywords, onkeywordNameChange, }: KeywordSelectProps) {
+// contextからindex, keywordName, onChangeを取得する前提の新しいKeywordSelect
+export default function KeywordSelect({ index, keywordIndex }: { index: number, keywordIndex: number }) {
+  const keywords = useKeywordsStore();
+  const promptGenerators = usePromptGeneratorsStore();
+  const dispatch = usePromptGeneratorsDispatch();
   const [inputValue, setInputValue] = React.useState('');
+
+  // 現在のkeywordNameをcontextから取得
+  const keywordName = promptGenerators[index]?.selectedKeywordNames[keywordIndex]?.name || defaultKeywordName;
+
+  // 値変更時のdispatch
+  const handleKeywordNameChange = (newKeywordName: string | null) => {
+    if (!promptGenerators[index]) return;
+    const updated = promptGenerators[index].selectedKeywordNames.map((item, i) =>
+      i === keywordIndex ? { ...item, name: newKeywordName ?? defaultKeywordName } : item
+    );
+    dispatch({
+      type: "UPDATE_PROMPT_GENERATOR",
+      index,
+      payload: { ...promptGenerators[index], selectedKeywordNames: updated }
+    });
+  };
+
   const keywordNames = ["削除する", "空白"]
     .concat(keywords.map((k) => k.name))
     .filter((v, i, arr) => v !== "" && arr.indexOf(v) === i);
@@ -39,9 +55,7 @@ export default function KeywordSelect({ keywordName, keywords, onkeywordNameChan
       fullWidth
       size="small"
       onChange={(_, newKeywordName: string | null) => {
-        if (onkeywordNameChange) {
-          onkeywordNameChange(newKeywordName ?? defaultKeywordName);
-        }
+        handleKeywordNameChange(newKeywordName);
       }}
       onInputChange={(_, newInputValue) => {
         setInputValue(newInputValue);
