@@ -1,4 +1,4 @@
-import { Data, Keyword } from "./data";
+import { Keyword } from "./data";
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import Box from '@mui/material/Box';
@@ -6,12 +6,10 @@ import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
 import Button from '@mui/material/Button';
-import DragHandleIcon from '@mui/icons-material/DragHandle';
 import ForkLeftIcon from '@mui/icons-material/ForkLeft';
 import ForkRightIcon from '@mui/icons-material/ForkRight';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import KeywordSelect from "./KeywordSelect";
 import ResultText from "./ResultText";
 import IconButton from "@mui/material/IconButton";
 import {
@@ -25,96 +23,16 @@ import {
 import {
   arrayMove,
   SortableContext,
-  useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { v4 as uuidv4 } from "uuid";
 import { Fragment } from "react/jsx-runtime";
-import { useRef, useState } from "react";
 import { useKeywordsStore } from "./contexts/keywordsContext";
 import { useDefaultCharactersStore } from "./contexts/defaultsContext";
 import { usePromptGeneratorsStore, usePromptGeneratorsDispatch } from "./contexts/promptGeneratorsContext";
 import { useCharacterTypeNameStore } from "./contexts/characterTypeNameContext";
-
-function InsertButton({ onClick }: { onClick: () => void }) {
-  const [visible, setVisible] = useState(false);
-  const timeoutRef = useRef<number | undefined>();
-
-  const handleMouseEnter = () => {
-    timeoutRef.current = window.setTimeout(() => {
-      setVisible(true);
-    }, 300);
-  };
-
-  const handleMouseLeave = () => {
-    clearTimeout(timeoutRef.current);
-    setVisible(false);
-  };
-
-  return (
-    <Box
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      sx={{
-        position: "relative",
-        height: 12,
-        my: -0.8,
-      }}
-    >
-      <Box
-        sx={{
-          height: "3px",
-          opacity: visible ? 1 : 0,
-          backgroundColor: "success.main",
-        }}
-      />
-
-      {visible && (
-        <Button
-          onClick={onClick}
-          color="success"
-          variant="contained"
-          sx={{
-            position: "absolute",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            border: "1px solid",
-            transition: "opacity 0.2s ease",
-            opacity: visible ? 1 : 0,
-          }}
-        >
-          <AddIcon />
-        </Button>
-      )}
-    </Box>
-  );
-}
-
-function SortableKeyword({
-  index,
-  keywordIndex,
-}: {
-  index: number;
-  keywordIndex: number;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: `${index}-${keywordIndex}` });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  return (
-    <Box ref={setNodeRef} style={style} {...attributes} sx={{ display: "flex", alignItems: "center", ml: -1.5, mb: 1, cursor: "grab" }}>
-      <IconButton {...listeners} disableRipple sx={{ cursor: "grab" }}>
-        <DragHandleIcon />
-      </IconButton>
-      <KeywordSelect index={index} keywordIndex={keywordIndex} />
-    </Box>
-  );
-}
+import InsertButton from "./InsertButton";
+import SortableKeyword from "./SortableKeyword";
 
 interface PromptGeneratorProps {
   index: number;
