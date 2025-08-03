@@ -35,6 +35,20 @@ export default function KeywordSelect({ selectedKeywordName }: { selectedKeyword
   // 値変更時のdispatch
   const handleKeywordNameChange = (newKeywordName: string | null) => {
     if (!promptGenerators[index]) return;
+    
+    if (newKeywordName === "削除する") {
+      const updated = promptGenerators[index].selectedKeywordNames.filter(
+        (item) => item.id !== selectedKeywordName.id
+      );
+      dispatch({
+        type: "UPDATE_PROMPT_GENERATOR",
+        index,
+        payload: { ...promptGenerators[index], selectedKeywordNames: updated }
+      });
+      return;
+    }
+    
+    // 通常のキーワード名変更
     const updated = promptGenerators[index].selectedKeywordNames.map((item, i) =>
       item.id === selectedKeywordName.id ? { ...item, name: newKeywordName ?? defaultKeywordName } : item
     );
