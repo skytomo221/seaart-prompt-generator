@@ -7,6 +7,7 @@ import SpaceBarIcon from '@mui/icons-material/SpaceBar';
 import Typography from '@mui/material/Typography';
 import { useKeywordsStore } from './contexts/keywordsContext';
 import { usePromptGeneratorsStore, usePromptGeneratorsDispatch } from './contexts/promptGeneratorsContext';
+import { SelectedKeywordName } from './selectedKeywordName';
 
 const defaultKeywordName = "空白";
 
@@ -21,20 +22,21 @@ function renderKeywordName(keywordName: string) {
 }
 
 // contextからindex, keywordName, onChangeを取得する前提の新しいKeywordSelect
-export default function KeywordSelect({ index, keywordIndex }: { index: number, keywordIndex: number }) {
+export default function KeywordSelect({ selectedKeywordName }: { selectedKeywordName: SelectedKeywordName }) {
   const keywords = useKeywordsStore();
   const promptGenerators = usePromptGeneratorsStore();
   const dispatch = usePromptGeneratorsDispatch();
   const [inputValue, setInputValue] = React.useState('');
 
   // 現在のkeywordNameをcontextから取得
-  const keywordName = promptGenerators[index]?.selectedKeywordNames[keywordIndex]?.name || defaultKeywordName;
+  const index = promptGenerators.findIndex((pg) => pg.selectedKeywordNames.some((k) => k.id === selectedKeywordName.id));
+  const keywordName = promptGenerators[index]?.selectedKeywordNames.find((k) => k.id === selectedKeywordName.id)?.name || defaultKeywordName;
 
   // 値変更時のdispatch
   const handleKeywordNameChange = (newKeywordName: string | null) => {
     if (!promptGenerators[index]) return;
     const updated = promptGenerators[index].selectedKeywordNames.map((item, i) =>
-      i === keywordIndex ? { ...item, name: newKeywordName ?? defaultKeywordName } : item
+      item.id === selectedKeywordName.id ? { ...item, name: newKeywordName ?? defaultKeywordName } : item
     );
     dispatch({
       type: "UPDATE_PROMPT_GENERATOR",

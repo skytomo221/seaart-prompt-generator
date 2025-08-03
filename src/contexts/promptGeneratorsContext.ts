@@ -1,9 +1,5 @@
 import makeStore from "./makeStore";
-
-type SelectedKeywordName = {
-  id: string;
-  name: string;
-};
+import { SelectedKeywordName } from "../selectedKeywordName";
 
 type PromptGenerator = {
   id: string;

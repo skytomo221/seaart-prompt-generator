@@ -109,8 +109,8 @@ function PromptGenerator({ index }: PromptGeneratorProps) {
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const oldIndex = pg.selectedKeywordNames.findIndex((item) => `${index}-${item.id}` === active.id);
-    const newIndex = pg.selectedKeywordNames.findIndex((item) => `${index}-${item.id}` === over.id);
+    const oldIndex = pg.selectedKeywordNames.findIndex((selectedKeywordName) => `${selectedKeywordName.id}` === active.id);
+    const newIndex = pg.selectedKeywordNames.findIndex((selectedKeywordName) => `${selectedKeywordName.id}` === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
     const newArray = arrayMove(pg.selectedKeywordNames, oldIndex, newIndex);
     promptGeneratorsDispatch({
@@ -139,13 +139,12 @@ function PromptGenerator({ index }: PromptGeneratorProps) {
           <div>
             <div id="keywords"></div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={pg.selectedKeywordNames.map((keywordName) => `${index}-${keywordName.id}`)} strategy={verticalListSortingStrategy}>
+              <SortableContext items={pg.selectedKeywordNames.map((selectedKeywordName) => `${selectedKeywordName.id}`)} strategy={verticalListSortingStrategy}>
                 {pg.selectedKeywordNames.map((keywordName, i) => (
                   <Fragment key={keywordName.id}>
                     <InsertButton onClick={() => insertKeywordAt(i)} />
                     <SortableKeyword
-                      index={index}
-                      keywordIndex={i}
+                      selectedKeywordName={keywordName}
                     />
                   </Fragment>
                 ))}

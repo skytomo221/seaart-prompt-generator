@@ -6,16 +6,15 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { SelectedKeywordName } from "./selectedKeywordName";
 
 export default function SortableKeyword({
-  index,
-  keywordIndex,
+  selectedKeywordName,
 }: {
-  index: number;
-  keywordIndex: number;
+  selectedKeywordName: SelectedKeywordName;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: `${index}-${keywordIndex}` });
+    useSortable({ id: `${selectedKeywordName.id}` });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -27,7 +26,7 @@ export default function SortableKeyword({
       <IconButton {...listeners} disableRipple sx={{ cursor: "grab" }}>
         <DragHandleIcon />
       </IconButton>
-      <KeywordSelect index={index} keywordIndex={keywordIndex} />
+      <KeywordSelect selectedKeywordName={selectedKeywordName} />
     </Box>
   );
 }
