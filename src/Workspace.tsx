@@ -1,15 +1,17 @@
+import * as React from 'react';
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Data } from "./data";
-import PromptGenerator from "./PromptGenerator";
-import Box from "@mui/material/Box";
-import Stack from '@mui/material/Stack';
-import { motion, AnimatePresence } from "framer-motion";
-import { useKeywordsDispatch } from "./contexts/keywordsContext";
-import { useDefaultCharactersDispatch } from "./contexts/defaultsContext";
-import { usePromptGeneratorsStore, usePromptGeneratorsDispatch } from "./contexts/promptGeneratorsContext";
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import Box from '@mui/material/Box';
+import PromptGeneratorsTab from './PromptGeneratorsTab';
+import { useKeywordsDispatch } from './contexts/keywordsContext';
+import { useDefaultCharactersDispatch } from './contexts/defaultsContext';
+import { usePromptGeneratorsStore, usePromptGeneratorsDispatch } from './contexts/promptGeneratorsContext';
 
-export default function Workspace() {
+export default function TabsWrappedLabel() {
+  const [value, setValue] = React.useState('prompt-generators');
   const [message, setMessage] = useState("");
 
   const keywordsDispatch = useKeywordsDispatch();
@@ -29,27 +31,35 @@ export default function Workspace() {
       });
   }, [keywordsDispatch, defaultCharactersDispatch, promptGenerators.length, promptGeneratorsDispatch]);
 
+  const handleChange = (_: React.SyntheticEvent, newValue: string) => {
+    setValue(newValue);
+  };
+
   return (
-    <div style={{ padding: "1em" }}>
-      <div>{message}</div>
-      <Box sx={{ my: 2, display: "flex" }}>
-        <AnimatePresence initial={false}>
-          {promptGenerators.map((pg, index) => (
-            <motion.div
-              key={pg.id}
-              layout="position"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Stack direction="row">
-                <PromptGenerator index={index} />
-              </Stack>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+    <Box sx={{ width: '100%' }}>
+      <Box
+        sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1100,
+          bgcolor: 'background.paper',
+        }}
+      >
+        <Tabs
+          value={value}
+          onChange={handleChange}
+          aria-label="wrapped label tabs example"
+        >
+          <Tab value="prompt-generators" label="プロンプト生成" />
+          <Tab value="keywords" label="キーワード設定" />
+        </Tabs>
       </Box>
-    </div>
+      <Box pt={4}>
+        <div>{message}</div>
+        {value === "prompt-generators" && <PromptGeneratorsTab />}
+      </Box>
+    </Box>
   );
 }
