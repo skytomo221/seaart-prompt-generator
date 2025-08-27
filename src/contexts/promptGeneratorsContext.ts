@@ -1,14 +1,13 @@
 import makeStore from "./makeStore";
-import { SelectedKeywordName } from "../selectedKeywordName";
-
-type PromptGenerator = {
-  id: string;
-  selectedKeywordNames: SelectedKeywordName[];
-};
+import { PromptGenerator } from "../promptGenerator";
 
 type State = PromptGenerator[];
 
 type Action =
+  | {
+      type: "SET_PROMPT_GENERATORS";
+      payload: PromptGenerator[];
+    }
   | {
       type: "ADD_PROMPT_GENERATOR";
       index: number;
@@ -38,6 +37,8 @@ const initialState: State = [
 
 const reducer = (state: State, action: Action) => {
   switch (action.type) {
+    case "SET_PROMPT_GENERATORS":
+      return action.payload;
     case "ADD_PROMPT_GENERATOR":
       const newState = [...state];
       newState.splice(action.index, 0, action.payload);

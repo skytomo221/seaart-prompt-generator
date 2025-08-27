@@ -1,14 +1,16 @@
 import * as React from 'react';
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Data } from "./data";
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
 import PromptGeneratorsTab from './PromptGeneratorsTab';
-import { useKeywordsDispatch } from './contexts/keywordsContext';
-import { useDefaultCharactersDispatch } from './contexts/defaultsContext';
+import { useKeywordsDispatch, useKeywordsStore } from './contexts/keywordsContext';
+import { useDefaultCharactersStore, useDefaultCharactersDispatch } from './contexts/defaultsContext';
 import { usePromptGeneratorsStore, usePromptGeneratorsDispatch } from './contexts/promptGeneratorsContext';
+import { PromptGenerator } from './promptGenerator';
 
 export default function TabsWrappedLabel() {
   const [value, setValue] = React.useState('prompt-generators');
@@ -16,20 +18,73 @@ export default function TabsWrappedLabel() {
 
   const keywordsDispatch = useKeywordsDispatch();
   const defaultCharactersDispatch = useDefaultCharactersDispatch();
+  const keywords = useKeywordsStore();
+  const defaultCharacters = useDefaultCharactersStore();
   const promptGenerators = usePromptGeneratorsStore();
   const promptGeneratorsDispatch = usePromptGeneratorsDispatch();
 
   useEffect(() => {
-    invoke("load_config")
+    invoke("load_configs")
       .then((res) => {
-        const data = res as Data;
+        const { data, prompt_generators: promptGenerators } = res as { data: Data, prompt_generators: PromptGenerator[] };
         keywordsDispatch({ type: "SET_KEYWORDS", payload: data.keywords });
         defaultCharactersDispatch({ type: "SET_DEFAULT_CHARACTERS", payload: data.defaults });
+        if (promptGenerators.length > 0) {
+          promptGeneratorsDispatch({ type: "SET_PROMPT_GENERATORS", payload: promptGenerators });
+        }
       })
       .catch((err) => {
         setMessage(String(err));
       });
   }, [keywordsDispatch, defaultCharactersDispatch, promptGenerators.length, promptGeneratorsDispatch]);
+
+  const keywordsRef = useRef(keywords);
+  const defaultCharactersRef = useRef(defaultCharacters);
+  const promptGeneratorsRef = useRef(promptGenerators);
+  useEffect(() => { keywordsRef.current = keywords; }, [keywords]);
+  useEffect(() => { defaultCharactersRef.current = defaultCharacters; }, [defaultCharacters]);
+  useEffect(() => { promptGeneratorsRef.current = promptGenerators; }, [promptGenerators]);
+
+  useEffect(() => {
+    let cleanup: (() => void) | null = null;
+    let mounted = true;
+
+    (async () => {
+      const win = getCurrentWindow();
+      const unlisten = await win.onCloseRequested(async (event) => {
+        try {
+          console.log(
+            {
+              keywords: keywordsRef.current,
+              defaults: defaultCharactersRef.current,
+              promptGenerators: promptGeneratorsRef.current
+            }
+          )
+          await invoke("save_data", {
+            payload: {
+              keywords: keywordsRef.current,
+              defaults: defaultCharactersRef.current,
+              promptGenerators: promptGeneratorsRef.current
+            }
+          });
+        } catch (e) {
+          console.error("save_data failed:", e);
+          event.preventDefault();
+        }
+      });
+
+      if (mounted) {
+        cleanup = unlisten;
+      } else {
+        unlisten();
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      if (cleanup) cleanup();
+    };
+  }, []);
 
   const handleChange = (_: React.SyntheticEvent, newValue: string) => {
     setValue(newValue);

@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 
 src-tauri/data.json
+src-tauri/prompt-generators.json

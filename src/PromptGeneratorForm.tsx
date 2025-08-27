@@ -38,7 +38,7 @@ interface PromptGeneratorProps {
   index: number;
 }
 
-function PromptGenerator({ index }: PromptGeneratorProps) {
+function PromptGeneratorForm({ index }: PromptGeneratorProps) {
   const keywords = useKeywordsStore();
   const defaultCharacters = useDefaultCharactersStore();
   const promptGenerators = usePromptGeneratorsStore();
@@ -193,4 +193,4 @@ function PromptGenerator({ index }: PromptGeneratorProps) {
   );
 }
 
-export default PromptGenerator;
+export default PromptGeneratorForm;

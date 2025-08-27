@@ -1,4 +1,4 @@
-import PromptGenerator from "./PromptGenerator";
+import PromptGeneratorForm from "./PromptGeneratorForm";
 import Box from "@mui/material/Box";
 import Stack from '@mui/material/Stack';
 import { motion, AnimatePresence } from "framer-motion";
@@ -20,7 +20,7 @@ export default function PromptGeneratorsTab() {
             transition={{ duration: 0.2 }}
           >
             <Stack direction="row">
-              <PromptGenerator index={index} />
+              <PromptGeneratorForm index={index} />
             </Stack>
           </motion.div>
         ))}
