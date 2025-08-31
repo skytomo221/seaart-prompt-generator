@@ -7,10 +7,12 @@ import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
 import PromptGeneratorsTab from './PromptGeneratorsTab';
+import KeywordsTab from './KeywordsTab';
 import { useKeywordsDispatch, useKeywordsStore } from './contexts/keywordsContext';
 import { useDefaultCharactersStore, useDefaultCharactersDispatch } from './contexts/defaultsContext';
 import { usePromptGeneratorsStore, usePromptGeneratorsDispatch } from './contexts/promptGeneratorsContext';
 import { PromptGenerator } from './promptGenerator';
+import { v4 as uuidv4 } from "uuid";
 
 export default function TabsWrappedLabel() {
   const [value, setValue] = React.useState('prompt-generators');
@@ -27,7 +29,7 @@ export default function TabsWrappedLabel() {
     invoke("load_configs")
       .then((res) => {
         const { data, prompt_generators: promptGenerators } = res as { data: Data, prompt_generators: PromptGenerator[] };
-        keywordsDispatch({ type: "SET_KEYWORDS", payload: data.keywords });
+        keywordsDispatch({ type: "SET_KEYWORDS", payload: data.keywords.map(keyword => ({ ...keyword, id: uuidv4() })) });
         defaultCharactersDispatch({ type: "SET_DEFAULT_CHARACTERS", payload: data.defaults });
         if (promptGenerators.length > 0) {
           promptGeneratorsDispatch({ type: "SET_PROMPT_GENERATORS", payload: promptGenerators });
@@ -62,7 +64,7 @@ export default function TabsWrappedLabel() {
           )
           await invoke("save_data", {
             payload: {
-              keywords: keywordsRef.current,
+              keywords: keywordsRef.current.map(({ id, ...rest }) => rest),
               defaults: defaultCharactersRef.current,
               promptGenerators: promptGeneratorsRef.current
             }
@@ -114,6 +116,7 @@ export default function TabsWrappedLabel() {
       <Box pt={4}>
         <div>{message}</div>
         {value === "prompt-generators" && <PromptGeneratorsTab />}
+        {value === "keywords" && <KeywordsTab />}
       </Box>
     </Box>
   );

@@ -5,6 +5,7 @@ export interface Data {
 }
 
 export interface Keyword {
+  id: string;
   name: string;
   type: string;
   prompt: string;

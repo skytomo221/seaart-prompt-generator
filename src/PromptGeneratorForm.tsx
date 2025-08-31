@@ -79,7 +79,7 @@ function PromptGeneratorForm({ index }: PromptGeneratorProps) {
       def.parts.forEach((part) => {
         const alreadySelected = selectedKeywords.some((sel) => sel.type === part.type);
         if (alreadySelected) return;
-        const keyword: Keyword = { ...part, name: part.type };
+        const keyword: Keyword = { ...part, id: uuidv4(), name: part.type };
         if (keyword) mergedKeywords.push(keyword);
       });
     });
