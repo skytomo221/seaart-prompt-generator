@@ -65,7 +65,7 @@ export default function KeywordSelect({ selectedKeywordName }: { selectedKeyword
     }
 
     // 通常のキーワード名変更
-    const updated = promptGenerators[index].selectedKeywordNames.map((item, i) =>
+    const updated = promptGenerators[index].selectedKeywordNames.map((item, _) =>
       item.id === selectedKeywordName.id ? { ...item, name: newKeywordName ?? defaultKeywordName } : item
     );
     dispatch({
