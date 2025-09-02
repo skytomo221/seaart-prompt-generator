@@ -8,7 +8,9 @@ import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
 import PromptGeneratorsTab from './PromptGeneratorsTab';
 import KeywordsTab from './KeywordsTab';
+import KeywordTypesTab from './KeywordTypesTab';
 import { useKeywordsDispatch, useKeywordsStore } from './contexts/keywordsContext';
+import { useKeywordTypesDispatch, useKeywordTypesStore } from './contexts/keywordTypesContext';
 import { useDefaultCharactersStore, useDefaultCharactersDispatch } from './contexts/defaultsContext';
 import { usePromptGeneratorsStore, usePromptGeneratorsDispatch } from './contexts/promptGeneratorsContext';
 import { PromptGenerator } from './promptGenerator';
@@ -19,8 +21,10 @@ export default function TabsWrappedLabel() {
   const [message, setMessage] = useState("");
 
   const keywordsDispatch = useKeywordsDispatch();
+  const keywordTypesDispatch = useKeywordTypesDispatch();
   const defaultCharactersDispatch = useDefaultCharactersDispatch();
   const keywords = useKeywordsStore();
+  const keywordTypes = useKeywordTypesStore();
   const defaultCharacters = useDefaultCharactersStore();
   const promptGenerators = usePromptGeneratorsStore();
   const promptGeneratorsDispatch = usePromptGeneratorsDispatch();
@@ -30,6 +34,7 @@ export default function TabsWrappedLabel() {
       .then((res) => {
         const { data, prompt_generators: promptGenerators } = res as { data: Data, prompt_generators: PromptGenerator[] };
         keywordsDispatch({ type: "SET_KEYWORDS", payload: data.keywords.map(keyword => ({ ...keyword, id: uuidv4() })) });
+        keywordTypesDispatch({ type: "SET_KEYWORD_TYPES", payload: data.keywordTypes });
         defaultCharactersDispatch({ type: "SET_DEFAULT_CHARACTERS", payload: data.defaults });
         if (promptGenerators.length > 0) {
           promptGeneratorsDispatch({ type: "SET_PROMPT_GENERATORS", payload: promptGenerators });
@@ -38,12 +43,14 @@ export default function TabsWrappedLabel() {
       .catch((err) => {
         setMessage(String(err));
       });
-  }, [keywordsDispatch, defaultCharactersDispatch, promptGenerators.length, promptGeneratorsDispatch]);
+  }, [keywordsDispatch, keywordTypesDispatch, defaultCharactersDispatch, promptGenerators.length, promptGeneratorsDispatch]);
 
   const keywordsRef = useRef(keywords);
+  const keywordTypesRef = useRef(keywordTypes);
   const defaultCharactersRef = useRef(defaultCharacters);
   const promptGeneratorsRef = useRef(promptGenerators);
   useEffect(() => { keywordsRef.current = keywords; }, [keywords]);
+  useEffect(() => { keywordTypesRef.current = keywordTypes; }, [keywordTypes]);
   useEffect(() => { defaultCharactersRef.current = defaultCharacters; }, [defaultCharacters]);
   useEffect(() => { promptGeneratorsRef.current = promptGenerators; }, [promptGenerators]);
 
@@ -58,6 +65,7 @@ export default function TabsWrappedLabel() {
           console.log(
             {
               keywords: keywordsRef.current,
+              keywordTypes: keywordTypesRef.current,
               defaults: defaultCharactersRef.current,
               promptGenerators: promptGeneratorsRef.current
             }
@@ -65,6 +73,7 @@ export default function TabsWrappedLabel() {
           await invoke("save_data", {
             payload: {
               keywords: keywordsRef.current.map(({ id, ...rest }) => rest),
+              keywordTypes: keywordTypesRef.current.map(({ id, ...rest }) => rest),
               defaults: defaultCharactersRef.current,
               promptGenerators: promptGeneratorsRef.current
             }
@@ -111,12 +120,14 @@ export default function TabsWrappedLabel() {
         >
           <Tab value="prompt-generators" label="プロンプト生成" />
           <Tab value="keywords" label="キーワード設定" />
+          <Tab value="keyword-types" label="キーワードのタイプ" />
         </Tabs>
       </Box>
       <Box pt={4}>
         <div>{message}</div>
         {value === "prompt-generators" && <PromptGeneratorsTab />}
         {value === "keywords" && <KeywordsTab />}
+        {value === "keyword-types" && <KeywordTypesTab />}
       </Box>
     </Box>
   );

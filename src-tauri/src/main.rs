@@ -13,7 +13,7 @@ struct LoadPayload {
 
 #[command]
 fn load_configs() -> Result<LoadPayload, String> {
-    let default_data_json = r#"{"characterTypeName": "キャラ", "keywords": [], "defaults": []}"#;
+    let default_data_json = r#"{"characterTypeName": "キャラ", "keywords": [], "keywordTypes": [], "defaults": []}"#;
     let data = load_json("./data.json", default_data_json)?;
     let default_prompt_generators_json = r#"[]"#;
     let prompt_generators = load_json("./prompt-generators.json", default_prompt_generators_json)?;
@@ -39,6 +39,7 @@ fn load_json<P: AsRef<Path>>(path: P, default_json: &str) -> Result<serde_json::
 #[serde(rename_all = "camelCase")]
 struct SavePayload {
     keywords: Json,
+    keyword_types: Json,
     defaults: Json,
     prompt_generators: Json,
 }
@@ -48,6 +49,7 @@ async fn save_data(payload: SavePayload) -> Result<(), String> {
     let data = json!({
         "characterTypeName": "キャラ",
         "keywords": payload.keywords,
+        "keywordTypes": payload.keyword_types,
         "defaults": payload.defaults
     });
     fs::write(

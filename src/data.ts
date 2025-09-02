@@ -1,6 +1,7 @@
 export interface Data {
   characterTypeName: string;
   keywords: Keyword[];
+  keywordTypes: KeywordType[];
   defaults: DefaultCharacter[];
 }
 
@@ -10,6 +11,13 @@ export interface Keyword {
   type: string;
   prompt: string;
   negativePrompt?: string;
+}
+
+export interface KeywordType {
+  id: string;
+  name: string;
+  backgroundColor: string;
+  color: string;
 }
 
 export interface DefaultCharacter {
