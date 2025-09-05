@@ -43,7 +43,7 @@ export default function TabsWrappedLabel() {
       .catch((err) => {
         setMessage(String(err));
       });
-  }, [keywordsDispatch, keywordTypesDispatch, defaultCharactersDispatch, promptGenerators.length, promptGeneratorsDispatch]);
+  }, []);
 
   const keywordsRef = useRef(keywords);
   const keywordTypesRef = useRef(keywordTypes);
