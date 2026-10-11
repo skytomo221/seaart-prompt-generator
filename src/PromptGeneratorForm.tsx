@@ -81,7 +81,7 @@ function PromptGeneratorForm({ index }: PromptGeneratorProps) {
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={pg.selectedKeywordNames.map((item) => `${item.id}`)} strategy={verticalListSortingStrategy}>
           {pg.selectedKeywordNames.map((keywordName, i) => <Fragment key={keywordName.id}>
-            <InsertButton onClick={() => insertKeywordAt(i)} />
+            <InsertButton ariaLabel="insert keyword" onClick={() => insertKeywordAt(i)} />
             <SortableKeyword selectedKeywordName={keywordName} />
           </Fragment>)}
         </SortableContext>

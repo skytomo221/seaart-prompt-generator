@@ -1,10 +1,15 @@
 import PromptGeneratorForm from "./PromptGeneratorForm";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePromptGeneratorsStore } from "./contexts/promptGeneratorsContext";
+import { MutableRefObject, useLayoutEffect, useRef } from "react";
 
-export default function PromptGeneratorsTab() {
+export default function PromptGeneratorsTab({ scrollLeftRef }: { scrollLeftRef: MutableRefObject<number> }) {
   const promptGenerators = usePromptGeneratorsStore();
-  return <div className="prompt-generators-tab">
+  const tabRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (tabRef.current) tabRef.current.scrollLeft = scrollLeftRef.current;
+  }, [scrollLeftRef]);
+  return <div ref={tabRef} className="prompt-generators-tab" onScroll={(event) => { scrollLeftRef.current = event.currentTarget.scrollLeft; }}>
     <AnimatePresence initial={false}>
       {promptGenerators.map((pg, index) => <motion.div
         key={pg.id}

@@ -47,6 +47,8 @@ body {
   gap: 4px;
   overflow-x: auto;
   min-height: calc(100vh - 52px);
+  padding: 1px 1px 2px;
+  box-sizing: border-box;
 }
 
 .prompt-generators-tab > * {
@@ -227,9 +229,100 @@ body {
   width: 100%;
 }
 
+.editor-tab-content {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 8px;
+  height: calc(100vh - 60px);
+  min-height: 300px;
+  overflow: hidden;
+}
+
+.editor-list-pane,
+.editor-detail-pane {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--bp6-divider-black, rgba(16, 22, 26, 0.15));
+  border-radius: 3px;
+  background: var(--bp6-app-background-color, #fff);
+}
+
+.editor-list-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px;
+}
+
+.editor-list-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-list-row {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  border-radius: 3px;
+}
+
+.editor-list-row.is-selected {
+  background: var(--bp6-selected-row-background-color, rgba(191, 204, 214, 0.35));
+}
+
+.editor-list-row.is-dragging {
+  z-index: 2;
+  opacity: 0.75;
+}
+
+.editor-list-drag-handle {
+  flex: 0 0 auto;
+  cursor: grab;
+}
+
+.editor-list-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 8px 6px 2px;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: var(--bp6-text-color, #182026);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.editor-detail-pane {
+  padding: 8px;
+}
+
+.keyword-editor-card,
+.keyword-type-editor-card {
+  width: 100%;
+}
+
+.editor-empty-state {
+  padding: 12px;
+  color: var(--bp6-text-color-muted);
+}
+
+.editor-list-pane > .insert-button-area {
+  flex: 0 0 8px;
+}
+
 @media (max-width: 700px) {
   .keyword-type-row,
   .keyword-form-row {
     flex-wrap: wrap;
+  }
+
+  .editor-tab-content {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(140px, 36vh) minmax(200px, 1fr);
+    height: calc(100vh - 60px);
   }
 }

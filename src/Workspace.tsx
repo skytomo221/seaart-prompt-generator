@@ -18,6 +18,13 @@ type WorkspaceTabId = "prompt-generators" | "keywords" | "keyword-types";
 export default function Workspace() {
   const [value, setValue] = useState<WorkspaceTabId>('prompt-generators');
   const [message, setMessage] = useState("");
+  const [selectedKeywordId, setSelectedKeywordId] = useState<string | null>(null);
+  const [selectedKeywordTypeId, setSelectedKeywordTypeId] = useState<string | null>(null);
+  const keywordListScrollTop = useRef(0);
+  const keywordTypeListScrollTop = useRef(0);
+  const keywordEditorScrollTop = useRef(0);
+  const keywordTypeEditorScrollTop = useRef(0);
+  const promptGeneratorsScrollLeft = useRef(0);
   const keywordsDispatch = useKeywordsDispatch();
   const keywordTypesDispatch = useKeywordTypesDispatch();
   const defaultCharactersDispatch = useDefaultCharactersDispatch();
@@ -31,8 +38,12 @@ export default function Workspace() {
     invoke("load_configs")
       .then((res) => {
         const { data, prompt_generators: promptGenerators } = res as { data: Data, prompt_generators: PromptGenerator[] };
-        keywordsDispatch({ type: "SET_KEYWORDS", payload: data.keywords.map(keyword => ({ ...keyword, id: uuidv4() })) });
-        keywordTypesDispatch({ type: "SET_KEYWORD_TYPES", payload: data.keywordTypes });
+        const keywordsWithIds = data.keywords.map(keyword => ({ ...keyword, id: uuidv4() }));
+        const keywordTypesWithIds = data.keywordTypes.map(keywordType => ({ ...keywordType, id: uuidv4() }));
+        keywordsDispatch({ type: "SET_KEYWORDS", payload: keywordsWithIds });
+        keywordTypesDispatch({ type: "SET_KEYWORD_TYPES", payload: keywordTypesWithIds });
+        setSelectedKeywordId(keywordsWithIds[0]?.id ?? null);
+        setSelectedKeywordTypeId(keywordTypesWithIds[0]?.id ?? null);
         defaultCharactersDispatch({ type: "SET_DEFAULT_CHARACTERS", payload: data.defaults });
         if (promptGenerators.length > 0) promptGeneratorsDispatch({ type: "SET_PROMPT_GENERATORS", payload: promptGenerators });
       })
@@ -83,9 +94,19 @@ export default function Workspace() {
     </div>
     <main className="workspace-content">
       {message && <div className="load-error">{message}</div>}
-      {value === "prompt-generators" && <PromptGeneratorsTab />}
-      {value === "keywords" && <KeywordsTab />}
-      {value === "keyword-types" && <KeywordTypesTab />}
+      {value === "prompt-generators" && <PromptGeneratorsTab scrollLeftRef={promptGeneratorsScrollLeft} />}
+      {value === "keywords" && <KeywordsTab
+        selectedKeywordId={selectedKeywordId}
+        onSelectedKeywordIdChange={setSelectedKeywordId}
+        listScrollTopRef={keywordListScrollTop}
+        editorScrollTopRef={keywordEditorScrollTop}
+      />}
+      {value === "keyword-types" && <KeywordTypesTab
+        selectedKeywordTypeId={selectedKeywordTypeId}
+        onSelectedKeywordTypeIdChange={setSelectedKeywordTypeId}
+        listScrollTopRef={keywordTypeListScrollTop}
+        editorScrollTopRef={keywordTypeEditorScrollTop}
+      />}
     </main>
   </div>;
 }
