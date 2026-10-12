@@ -1,2 +1,60 @@
-import {TinyColor} from "@ctrl/tinycolor";import {Button,FormGroup,InputGroup,Popover} from "@blueprintjs/core";import {HexColorPicker} from "react-colorful";import {useEffect,useState} from "react";
-export default function ColorInput({label,value,onChange}:{label:string;value:string;onChange:(v:string)=>void}){const[draft,setDraft]=useState(value);useEffect(()=>setDraft(value),[value]);const c=new TinyColor(value),picker=c.isValid?c.toHexString():"#000000";const commit=()=>{if(draft==="")onChange("");else if(new TinyColor(draft).isValid)onChange(draft);else setDraft(value)};return <FormGroup label={label} className="color-input"><Popover placement="bottom-start" content={<div className="color-input-popover"><HexColorPicker color={picker} onChange={x=>{setDraft(x);onChange(x)}}/><InputGroup value={draft} onChange={e=>setDraft(e.currentTarget.value)} onBlur={commit} onKeyDown={e=>{if(e.key==="Enter"){commit();e.currentTarget.blur()}}}/></div>}><Button className="color-input-trigger" variant="outlined" size="small"><span className="color-input-swatch" style={c.isValid?{backgroundColor:c.toRgbString()}:undefined}/><span>{value||"色を選択"}</span></Button></Popover></FormGroup>}
+import { TinyColor } from "@ctrl/tinycolor";
+import { Button, FormGroup, InputGroup, Popover } from "@blueprintjs/core";
+import { HexColorPicker } from "react-colorful";
+import { useEffect, useState } from "react";
+export default function ColorInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  const c = new TinyColor(value),
+    picker = c.isValid ? c.toHexString() : "#000000";
+  const commit = () => {
+    if (draft === "") onChange("");
+    else if (new TinyColor(draft).isValid) onChange(draft);
+    else setDraft(value);
+  };
+  return (
+    <FormGroup label={label} className="color-input">
+      <Popover
+        placement="bottom-start"
+        content={
+          <div className="color-input-popover">
+            <HexColorPicker
+              color={picker}
+              onChange={(x) => {
+                setDraft(x);
+                onChange(x);
+              }}
+            />
+            <InputGroup
+              value={draft}
+              onChange={(e) => setDraft(e.currentTarget.value)}
+              onBlur={commit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  commit();
+                  e.currentTarget.blur();
+                }
+              }}
+            />
+          </div>
+        }
+      >
+        <Button className="color-input-trigger" variant="outlined" size="small">
+          <span
+            className="color-input-swatch"
+            style={c.isValid ? { backgroundColor: c.toRgbString() } : undefined}
+          />
+          <span>{value || "色を選択"}</span>
+        </Button>
+      </Popover>
+    </FormGroup>
+  );
+}

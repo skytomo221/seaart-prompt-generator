@@ -2,15 +2,15 @@ import React, { createContext, useContext, useReducer } from "react";
 
 export default function makeStore<S, A>(
   reducer: (state: S, action: A) => S,
-  initialState: S
+  initialState: S,
 ): [
   ({ children }: { children: React.ReactNode }) => React.JSX.Element,
   () => S,
-  () => React.Dispatch<A>
+  () => React.Dispatch<A>,
 ] {
   const storeContext = createContext<S | undefined>(undefined);
   const dispatchContext = createContext<React.Dispatch<A> | undefined>(
-    undefined
+    undefined,
   );
 
   const StoreProvider = ({ children }: { children: React.ReactNode }) => {

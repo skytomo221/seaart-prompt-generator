@@ -1,8 +1,144 @@
-import {useEffect,useRef,useState} from "react";import {invoke} from "@tauri-apps/api/core";import {getCurrentWindow} from "@tauri-apps/api/window";import {Callout,Tabs,Tab} from "@blueprintjs/core";
-import {Data,PromptGeneratorsData} from "./data";import {useData,useGenerators} from "./contexts/v2Context";import {validateData} from "./domain/validation";import PromptGeneratorsTab from "./PromptGeneratorsTab";import ConceptsTab from "./ConceptsTab";import CategoriesTab from "./CategoriesTab";import AttributesTab from "./AttributesTab";import "./App.css";
-type TabId="prompt"|"concepts"|"categories"|"attributes";
-export default function Workspace(){const[data,setData]=useData();const[generators,setGenerators]=useGenerators();const[tab,setTab]=useState<TabId>("prompt");const[selection,setSelection]=useState<Record<string,string>>({});const[error,setError]=useState("");const[loaded,setLoaded]=useState(false);const conceptListScrollTop=useRef(0);const categoryListScrollTop=useRef(0);
-useEffect(()=>{invoke("load_configs").then((raw:any)=>{const d=raw.data as Data,g=raw.prompt_generators as PromptGeneratorsData;const errors=validateData(d,g);if(errors.length)setError(errors.join("\n"));setData({type:"set",value:d});setGenerators({type:"set",value:g});setSelection({concepts:d.concepts[0]?.id??"",categories:d.categories[0]?.id??"",attributes:d.attributes[0]?.id??""});setLoaded(true)}).catch(e=>setError(String(e)))},[]);
-useEffect(()=>{if(error.includes(": empty matcher")&&validateData(data,generators).length===0)setError("")},[data,generators,error]);
-useEffect(()=>{let off:(()=>void)|undefined,active=true;getCurrentWindow().onCloseRequested(async event=>{if(!loaded)return;const errors=validateData(data,generators);if(errors.length){setError(errors.join("\n"));event.preventDefault();return}try{await invoke("save_data",{payload:{data,promptGenerators:generators}})}catch(error){setError(String(error));event.preventDefault()}}).then(dispose=>{off=dispose;if(!active)dispose()});return()=>{active=false;off?.()}},[data,generators,loaded]);
-return <div className="workspace"><div className="workspace-tabs-header"><Tabs id="workspace-tabs" selectedTabId={tab} onChange={id=>setTab(id as TabId)}><Tab id="prompt" title="プロンプト生成"/><Tab id="concepts" title="コンセプト"/><Tab id="categories" title="カテゴリ"/><Tab id="attributes" title="属性"/></Tabs></div><main className="workspace-content">{error&&<Callout intent="danger" className="load-error" style={{whiteSpace:"pre-wrap"}}>{error}</Callout>}{tab==="prompt"?<PromptGeneratorsTab data={data} generators={generators.promptGenerators} onChange={promptGenerators=>setGenerators({type:"set",value:{...generators,promptGenerators}})}/>:tab==="concepts"?<ConceptsTab data={data} onChange={d=>setData({type:"set",value:d})} generators={generators} selectedId={selection.concepts??""} onSelect={id=>setSelection(s=>({...s,concepts:id}))} onError={setError} scrollTopRef={conceptListScrollTop}/>:tab==="categories"?<CategoriesTab data={data} onChange={d=>setData({type:"set",value:d})} selectedId={selection.categories??""} onSelect={id=>setSelection(s=>({...s,categories:id}))} onError={setError} scrollTopRef={categoryListScrollTop}/>:<AttributesTab data={data} onChange={d=>setData({type:"set",value:d})} selectedId={selection.attributes??""} onSelect={id=>setSelection(s=>({...s,attributes:id}))} onError={setError}/>}</main></div>}
+import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Callout, Tabs, Tab } from "@blueprintjs/core";
+import { Data, PromptGeneratorsData } from "./data";
+import { useData, useGenerators } from "./contexts/v2Context";
+import { validateData } from "./domain/validation";
+import PromptGeneratorsTab from "./PromptGeneratorsTab";
+import ConceptsTab from "./ConceptsTab";
+import CategoriesTab from "./CategoriesTab";
+import AttributesTab from "./AttributesTab";
+import "./App.css";
+type TabId = "prompt" | "concepts" | "categories" | "attributes";
+export default function Workspace() {
+  const [data, setData] = useData();
+  const [generators, setGenerators] = useGenerators();
+  const [tab, setTab] = useState<TabId>("prompt");
+  const [selection, setSelection] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const conceptListScrollTop = useRef(0);
+  const categoryListScrollTop = useRef(0);
+  useEffect(() => {
+    invoke("load_configs")
+      .then((raw: any) => {
+        const d = raw.data as Data,
+          g = raw.prompt_generators as PromptGeneratorsData;
+        const errors = validateData(d, g);
+        if (errors.length) setError(errors.join("\n"));
+        setData({ type: "set", value: d });
+        setGenerators({ type: "set", value: g });
+        setSelection({
+          concepts: d.concepts[0]?.id ?? "",
+          categories: d.categories[0]?.id ?? "",
+          attributes: d.attributes[0]?.id ?? "",
+        });
+        setLoaded(true);
+      })
+      .catch((e) => setError(String(e)));
+  }, []);
+  useEffect(() => {
+    if (
+      error.includes(": empty matcher") &&
+      validateData(data, generators).length === 0
+    )
+      setError("");
+  }, [data, generators, error]);
+  useEffect(() => {
+    let off: (() => void) | undefined,
+      active = true;
+    getCurrentWindow()
+      .onCloseRequested(async (event) => {
+        if (!loaded) return;
+        const errors = validateData(data, generators);
+        if (errors.length) {
+          setError(errors.join("\n"));
+          event.preventDefault();
+          return;
+        }
+        try {
+          await invoke("save_data", {
+            payload: { data, promptGenerators: generators },
+          });
+        } catch (error) {
+          setError(String(error));
+          event.preventDefault();
+        }
+      })
+      .then((dispose) => {
+        off = dispose;
+        if (!active) dispose();
+      });
+    return () => {
+      active = false;
+      off?.();
+    };
+  }, [data, generators, loaded]);
+  return (
+    <div className="workspace">
+      <div className="workspace-tabs-header">
+        <Tabs
+          id="workspace-tabs"
+          selectedTabId={tab}
+          onChange={(id) => setTab(id as TabId)}
+        >
+          <Tab id="prompt" title="プロンプト生成" />
+          <Tab id="concepts" title="コンセプト" />
+          <Tab id="categories" title="カテゴリ" />
+          <Tab id="attributes" title="属性" />
+        </Tabs>
+      </div>
+      <main className="workspace-content">
+        {error && (
+          <Callout
+            intent="danger"
+            className="load-error"
+            style={{ whiteSpace: "pre-wrap" }}
+          >
+            {error}
+          </Callout>
+        )}
+        {tab === "prompt" ? (
+          <PromptGeneratorsTab
+            data={data}
+            generators={generators.promptGenerators}
+            onChange={(promptGenerators) =>
+              setGenerators({
+                type: "set",
+                value: { ...generators, promptGenerators },
+              })
+            }
+          />
+        ) : tab === "concepts" ? (
+          <ConceptsTab
+            data={data}
+            onChange={(d) => setData({ type: "set", value: d })}
+            generators={generators}
+            selectedId={selection.concepts ?? ""}
+            onSelect={(id) => setSelection((s) => ({ ...s, concepts: id }))}
+            onError={setError}
+            scrollTopRef={conceptListScrollTop}
+          />
+        ) : tab === "categories" ? (
+          <CategoriesTab
+            data={data}
+            onChange={(d) => setData({ type: "set", value: d })}
+            selectedId={selection.categories ?? ""}
+            onSelect={(id) => setSelection((s) => ({ ...s, categories: id }))}
+            onError={setError}
+            scrollTopRef={categoryListScrollTop}
+          />
+        ) : (
+          <AttributesTab
+            data={data}
+            onChange={(d) => setData({ type: "set", value: d })}
+            selectedId={selection.attributes ?? ""}
+            onSelect={(id) => setSelection((s) => ({ ...s, attributes: id }))}
+            onError={setError}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
