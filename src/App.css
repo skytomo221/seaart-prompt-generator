@@ -121,6 +121,36 @@ body {
   transform: translate(-50%, -50%);
 }
 
+.instance-insert-drop-target.is-active .insert-button-line {
+  opacity: 0.35;
+}
+
+.instance-insert-drop-target.is-over .insert-button-line {
+  opacity: 1;
+}
+
+.instance-add-button {
+  cursor: grab;
+  touch-action: none;
+}
+
+.instance-add-button.is-dragging {
+  cursor: grabbing;
+  opacity: 0.65;
+}
+
+.instance-delete-drop-zone {
+  margin-top: 4px;
+}
+
+.instance-delete-drop-zone .bp6-button {
+  pointer-events: none;
+}
+
+.instance-delete-drop-zone.is-over .bp6-button {
+  box-shadow: 0 0 0 2px var(--bp6-intent-danger);
+}
+
 .prompt-generator-header { display: flex; align-items: center; justify-content: space-between; }
 .prompt-generator-card { box-sizing: border-box; }
 .sortable-preset { display: flex; align-items: center; gap: 4px; width: 100%; }
