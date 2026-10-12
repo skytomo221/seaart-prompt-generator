@@ -14,11 +14,21 @@ pub struct Data {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Attribute { pub id: Id, pub name: String, pub implies: Vec<Id> }
+pub struct Attribute {
+    pub id: Id,
+    pub name: String,
+    pub implies: Vec<Id>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Category { pub id: Id, pub name: String, pub attribute_ids: Vec<Id>, pub background_color: String, pub color: String }
+pub struct Category {
+    pub id: Id,
+    pub name: String,
+    pub attribute_ids: Vec<Id>,
+    pub background_color: String,
+    pub color: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -35,23 +45,44 @@ pub struct Concept {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct VariantGroup { pub id: Id, pub name: String, pub min_selections: usize, #[serde(skip_serializing_if = "Option::is_none")] pub max_selections: Option<usize>, pub variants: Vec<Variant> }
+pub struct VariantGroup {
+    pub id: Id,
+    pub name: String,
+    pub min_selections: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_selections: Option<usize>,
+    pub variants: Vec<Variant>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Variant { pub id: Id, pub name: String, pub attribute_ids: Vec<Id> }
+pub struct Variant {
+    pub id: Id,
+    pub name: String,
+    pub attribute_ids: Vec<Id>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct VariantSelection { pub group_id: Id, pub variant_ids: Vec<Id> }
+pub struct VariantSelection {
+    pub group_id: Id,
+    pub variant_ids: Vec<Id>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Preset { pub id: Id, pub name: String, pub variant_selections: Vec<VariantSelection> }
+pub struct Preset {
+    pub id: Id,
+    pub name: String,
+    pub variant_selections: Vec<VariantSelection>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PromptFragmentSet { pub root: Vec<PromptFragment>, pub definitions: Vec<NamedPromptFragment> }
+pub struct PromptFragmentSet {
+    pub root: Vec<PromptFragment>,
+    pub definitions: Vec<NamedPromptFragment>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -65,14 +96,24 @@ pub struct NamedPromptFragment {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct FragmentReference { pub fragment_id: Id }
+pub struct FragmentReference {
+    pub fragment_id: Id,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum PromptFragment { Tag(Tag), Reference(FragmentReference) }
+pub enum PromptFragment {
+    Tag(Tag),
+    Reference(FragmentReference),
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum CompareOperator { #[serde(rename = "is")] Is, #[serde(rename = "isNot")] IsNot }
+pub enum CompareOperator {
+    #[serde(rename = "is")]
+    Is,
+    #[serde(rename = "isNot")]
+    IsNot,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum InstanceExistence {
@@ -85,24 +126,46 @@ pub enum InstanceExistence {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConceptConditionOperator {
-    #[serde(rename = "is")] Is,
-    #[serde(rename = "isNot")] IsNot,
-    #[serde(rename = "variantsMatch")] VariantsMatch,
-    #[serde(rename = "variantsDoNotMatch")] VariantsDoNotMatch,
+    #[serde(rename = "is")]
+    Is,
+    #[serde(rename = "isNot")]
+    IsNot,
+    #[serde(rename = "variantsMatch")]
+    VariantsMatch,
+    #[serde(rename = "variantsDoNotMatch")]
+    VariantsDoNotMatch,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct CategoryCondition { pub category_id: Id, pub operator: CompareOperator, #[serde(default)] pub existence: InstanceExistence }
+pub struct CategoryCondition {
+    pub category_id: Id,
+    pub operator: CompareOperator,
+    #[serde(default)]
+    pub existence: InstanceExistence,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct AttributeCondition { pub attribute_id: Id, pub operator: CompareOperator, #[serde(default)] pub existence: InstanceExistence }
+pub struct AttributeCondition {
+    pub attribute_id: Id,
+    pub operator: CompareOperator,
+    #[serde(default)]
+    pub existence: InstanceExistence,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PresetCondition { pub preset_id: Id, pub operator: CompareOperator, #[serde(default)] pub existence: InstanceExistence }
+pub struct PresetCondition {
+    pub preset_id: Id,
+    pub operator: CompareOperator,
+    #[serde(default)]
+    pub existence: InstanceExistence,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct VariantRequirement { pub group_id: Id, pub variant_id: Id }
+pub struct VariantRequirement {
+    pub group_id: Id,
+    pub variant_id: Id,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ConceptCondition {
@@ -127,15 +190,25 @@ pub enum Condition {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PresetSlot { pub id: Id, #[serde(skip_serializing_if = "Option::is_none")] pub preset_id: Option<Id> }
+pub struct PresetSlot {
+    pub id: Id,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preset_id: Option<Id>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PromptGenerator { pub id: Id, pub preset_slots: Vec<PresetSlot> }
+pub struct PromptGenerator {
+    pub id: Id,
+    pub preset_slots: Vec<PresetSlot>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PromptGeneratorsData { pub schema_version: u8, pub prompt_generators: Vec<PromptGenerator> }
+pub struct PromptGeneratorsData {
+    pub schema_version: u8,
+    pub prompt_generators: Vec<PromptGenerator>,
+}
 
 #[cfg(test)]
 mod tests {
@@ -150,6 +223,9 @@ mod tests {
         let out = serde_json::to_value(v).unwrap();
         assert_eq!(out["root"][1]["fragmentId"], "f");
         assert_eq!(out["definitions"][0]["if"]["category"]["operator"], "is");
-        assert_eq!(out["definitions"][0]["if"]["category"]["existence"], "notExists");
+        assert_eq!(
+            out["definitions"][0]["if"]["category"]["existence"],
+            "notExists"
+        );
     }
 }

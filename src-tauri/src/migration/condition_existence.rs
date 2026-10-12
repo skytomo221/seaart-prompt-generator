@@ -4,7 +4,13 @@ pub fn migrate_data(data: &mut Value) -> Result<bool, String> {
     let mut changed = false;
     for concept in data["concepts"].as_array_mut().into_iter().flatten() {
         for set_key in ["promptFragments", "negativePromptFragments"] {
-            let Some(definitions) = concept.get_mut(set_key).and_then(|set| set.get_mut("definitions")).and_then(Value::as_array_mut) else { continue; };
+            let Some(definitions) = concept
+                .get_mut(set_key)
+                .and_then(|set| set.get_mut("definitions"))
+                .and_then(Value::as_array_mut)
+            else {
+                continue;
+            };
             for definition in definitions {
                 if let Some(condition) = definition.get_mut("if") {
                     changed |= normalize_condition(condition)?;
@@ -18,18 +24,24 @@ pub fn migrate_data(data: &mut Value) -> Result<bool, String> {
 fn normalize_condition(condition: &mut Value) -> Result<bool, String> {
     if let Some(items) = condition.get_mut("all").and_then(Value::as_array_mut) {
         let mut changed = false;
-        for item in items { changed |= normalize_condition(item)?; }
+        for item in items {
+            changed |= normalize_condition(item)?;
+        }
         return Ok(changed);
     }
     if let Some(items) = condition.get_mut("any").and_then(Value::as_array_mut) {
         let mut changed = false;
-        for item in items { changed |= normalize_condition(item)?; }
+        for item in items {
+            changed |= normalize_condition(item)?;
+        }
         return Ok(changed);
     }
 
     for key in ["category", "attribute", "preset"] {
         if let Some(item) = condition.get_mut(key) {
-            if item.get("existence").is_some() { return Ok(false); }
+            if item.get("existence").is_some() {
+                return Ok(false);
+            }
             let operator = item.get("operator").and_then(Value::as_str).unwrap_or("is");
             if operator == "isNot" {
                 item["operator"] = json!("is");
@@ -44,7 +56,9 @@ fn normalize_condition(condition: &mut Value) -> Result<bool, String> {
     if condition.get("concept").is_some() {
         let replacement = {
             let item = condition.get_mut("concept").expect("concept checked above");
-            if item.get("existence").is_some() { return Ok(false); }
+            if item.get("existence").is_some() {
+                return Ok(false);
+            }
             let operator = item.get("operator").and_then(Value::as_str).unwrap_or("is");
             match operator {
                 "is" => {
@@ -61,7 +75,10 @@ fn normalize_condition(condition: &mut Value) -> Result<bool, String> {
                     None
                 }
                 "variantsDoNotMatch" => {
-                    let concept_id = item.get("conceptId").cloned().ok_or("Concept condition is missing conceptId")?;
+                    let concept_id = item
+                        .get("conceptId")
+                        .cloned()
+                        .ok_or("Concept condition is missing conceptId")?;
                     let variants = item.get("variants").cloned().unwrap_or_else(|| json!([]));
                     Some(json!({
                         "all": [
@@ -73,7 +90,9 @@ fn normalize_condition(condition: &mut Value) -> Result<bool, String> {
                 other => return Err(format!("Unknown concept condition operator: {other}")),
             }
         };
-        if let Some(replacement) = replacement { *condition = replacement; }
+        if let Some(replacement) = replacement {
+            *condition = replacement;
+        }
         return Ok(true);
     }
 
@@ -97,6 +116,9 @@ mod tests {
     fn keeps_explicit_new_semantics_unchanged() {
         let mut data = json!({"concepts":[{"promptFragments":{"definitions":[{"if":{"category":{"categoryId":"clothes","operator":"isNot","existence":"exists"}}}]},"negativePromptFragments":{"definitions":[]}}]});
         assert!(!migrate_data(&mut data).unwrap());
-        assert_eq!(data["concepts"][0]["promptFragments"]["definitions"][0]["if"]["category"]["operator"], "isNot");
+        assert_eq!(
+            data["concepts"][0]["promptFragments"]["definitions"][0]["if"]["category"]["operator"],
+            "isNot"
+        );
     }
 }
