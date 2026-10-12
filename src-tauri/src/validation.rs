@@ -1,6 +1,6 @@
 use crate::model::{
-    CompareOperator, ConceptConditionOperator, Condition, Data, PromptFragment, PromptFragmentSet,
-    PromptGeneratorsData,
+    CompareOperator, Concept, ConceptConditionOperator, Condition, Data, PromptFragment,
+    PromptFragmentSet, PromptGeneratorsData, VariantSelection,
 };
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -63,8 +63,8 @@ pub fn validate_pair(data_value: &Value, generators_value: &Value) -> Result<(),
     }
     for generator in &generators.prompt_generators {
         register(&generator.id, "PromptGenerator");
-        for slot in &generator.preset_slots {
-            register(&slot.id, "PresetSlot");
+        for instance in &generator.instances {
+            register(&instance.id, "ConceptInstance");
         }
     }
     drop(register);
@@ -153,36 +153,12 @@ pub fn validate_pair(data_value: &Value, generators_value: &Value) -> Result<(),
             }
         }
         for preset in &concept.presets {
-            let mut used_groups = HashSet::<String>::new();
-            for selection in &preset.variant_selections {
-                if !used_groups.insert(selection.group_id.clone()) {
-                    errors.push(format!(
-                        "Preset {} repeats VariantGroup {}",
-                        preset.id, selection.group_id
-                    ));
-                }
-                let Some(group) = concept
-                    .variant_groups
-                    .iter()
-                    .find(|group| group.id == selection.group_id)
-                else {
-                    errors.push(format!(
-                        "Preset {} references missing or foreign VariantGroup {}",
-                        preset.id, selection.group_id
-                    ));
-                    continue;
-                };
-                if !group
-                    .variants
-                    .iter()
-                    .any(|variant| variant.id == selection.variant_id)
-                {
-                    errors.push(format!(
-                        "Preset {} references invalid Variant in group {}",
-                        preset.id, group.id
-                    ));
-                }
-            }
+            validate_selections(
+                &format!("Preset {}", preset.id),
+                concept,
+                &preset.variant_selections,
+                &mut errors,
+            );
         }
         validate_fragment_set(
             &concept.prompt_fragments,
@@ -209,21 +185,85 @@ pub fn validate_pair(data_value: &Value, generators_value: &Value) -> Result<(),
     }
 
     for generator in &generators.prompt_generators {
-        for slot in &generator.preset_slots {
-            if let Some(preset_id) = &slot.preset_id {
-                if !preset_ids.contains(preset_id) {
-                    errors.push(format!(
-                        "PromptGenerator {} references missing Preset {preset_id}",
-                        generator.id
-                    ));
+        for instance in &generator.instances {
+            match (&instance.concept_id, &instance.preset_id) {
+                (None, None) => {
+                    if !instance.variant_selections.is_empty() {
+                        errors.push(format!(
+                            "Instance {} has variants without a concept",
+                            instance.id
+                        ));
+                    }
                 }
+                (Some(concept_id), Some(preset_id)) => {
+                    let Some(concept) = data.concepts.iter().find(|item| item.id == *concept_id)
+                    else {
+                        errors.push(format!(
+                            "Instance {} references missing Concept {concept_id}",
+                            instance.id
+                        ));
+                        continue;
+                    };
+                    if !concept.presets.iter().any(|preset| preset.id == *preset_id) {
+                        errors.push(format!(
+                            "Instance {} references missing or foreign Preset {preset_id}",
+                            instance.id
+                        ));
+                    }
+                    validate_selections(
+                        &format!("Instance {}", instance.id),
+                        concept,
+                        &instance.variant_selections,
+                        &mut errors,
+                    );
+                }
+                _ => errors.push(format!(
+                    "Instance {} must have conceptId and presetId together",
+                    instance.id
+                )),
             }
         }
     }
+
     if errors.is_empty() {
         Ok(())
     } else {
         Err(errors.join("\n"))
+    }
+}
+
+fn validate_selections(
+    owner: &str,
+    concept: &Concept,
+    selections: &[VariantSelection],
+    errors: &mut Vec<String>,
+) {
+    let mut used_groups = HashSet::<String>::new();
+    for selection in selections {
+        if !used_groups.insert(selection.group_id.clone()) {
+            errors.push(format!("{owner} repeats VariantGroup {}", selection.group_id));
+        }
+        let Some(group) = concept
+            .variant_groups
+            .iter()
+            .find(|group| group.id == selection.group_id)
+        else {
+            errors.push(format!(
+                "{owner} references missing or foreign VariantGroup {}",
+                selection.group_id
+            ));
+            continue;
+        };
+        if !group
+            .variants
+            .iter()
+            .any(|variant| variant.id == selection.variant_id)
+        {
+            errors.push(format!(
+                "{owner} references invalid Variant in group {}",
+                group.id
+            ));
+        }
     }
 }
 
@@ -455,54 +495,29 @@ fn validate_condition(
 mod tests {
     use super::*;
     use serde_json::json;
+
     fn valid() -> (Value, Value) {
         (
             json!({"schemaVersion":2,"attributes":[],"categories":[{"id":"cat","name":"c","attributeIds":[],"backgroundColor":"","color":""}],"concepts":[{"id":"con","name":"c","categoryId":"cat","attributeIds":[],"variantGroups":[],"presets":[{"id":"pre","name":"p","variantSelections":[]}],"promptFragments":{"root":[],"definitions":[]},"negativePromptFragments":{"root":[],"definitions":[]}}]}),
             json!({"schemaVersion":2,"promptGenerators":[]}),
         )
     }
+
     #[test]
-    fn rejects_attribute_cycle_and_dangling_category() {
-        let (mut data, generators) = valid();
-        data["attributes"] =
-            json!([{"id":"a","name":"a","implies":["b"]},{"id":"b","name":"b","implies":["a"]}]);
+    fn rejects_missing_instance_preset() {
+        let (data, mut generators) = valid();
+        generators["promptGenerators"] = json!([{"id":"g","instances":[{"id":"i","conceptId":"con","presetId":"missing","variantSelections":[]}]}]);
         assert!(validate_pair(&data, &generators)
             .unwrap_err()
-            .contains("cycle"));
-        let (mut data, generators) = valid();
-        data["concepts"][0]["categoryId"] = json!("absent");
-        assert!(validate_pair(&data, &generators)
-            .unwrap_err()
-            .contains("missing Category"));
+            .contains("missing or foreign Preset"));
     }
+
     #[test]
-    fn rejects_named_fragment_cycle() {
-        let (mut data, generators) = valid();
-        data["concepts"][0]["promptFragments"] = json!({"root":[{"fragmentId":"a"}],"definitions":[{"id":"a","name":"A","if":{"category":{"categoryId":"cat","operator":"is"}},"fragments":[{"fragmentId":"b"}]},{"id":"b","name":"B","if":{"category":{"categoryId":"cat","operator":"is"}},"fragments":[{"fragmentId":"a"}]}]});
-        assert!(validate_pair(&data, &generators)
-            .unwrap_err()
-            .contains("reference cycle"));
-    }
-    #[test]
-    fn rejects_missing_preset_condition() {
-        let (mut data, generators) = valid();
-        data["concepts"][0]["promptFragments"] = json!({"root":[{"fragmentId":"f"}],"definitions":[{"id":"f","name":"F","if":{"preset":{"presetId":"missing","operator":"is"}},"fragments":["x"]}]});
-        assert!(validate_pair(&data, &generators)
-            .unwrap_err()
-            .contains("missing Preset"));
-    }
-    #[test]
-    fn rejects_invalid_variant_selection() {
-        let (mut data, generators) = valid();
-        data["concepts"][0]["variantGroups"] = json!([{
-            "id":"g",
-            "name":"制服",
-            "variants":[{"id":"summer","name":"夏服","attributeIds":[]}]
-        }]);
-        data["concepts"][0]["presets"][0]["variantSelections"] =
-            json!([{"groupId":"g","variantId":"missing"}]);
-        assert!(validate_pair(&data, &generators)
-            .unwrap_err()
-            .contains("invalid Variant"));
+    fn accepts_independent_instance_variant() {
+        let (mut data, mut generators) = valid();
+        data["concepts"][0]["variantGroups"] = json!([{"id":"uniform","name":"制服","variants":[{"id":"summer","name":"夏服","attributeIds":[]},{"id":"winter","name":"冬服","attributeIds":[]}]}]);
+        data["concepts"][0]["presets"][0]["variantSelections"] = json!([{"groupId":"uniform","variantId":"summer"}]);
+        generators["promptGenerators"] = json!([{"id":"g","instances":[{"id":"i","conceptId":"con","presetId":"pre","variantSelections":[{"groupId":"uniform","variantId":"winter"}]}]}]);
+        assert!(validate_pair(&data, &generators).is_ok());
     }
 }

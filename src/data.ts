@@ -55,7 +55,10 @@ export interface VariantRequirement {
   variantId: Id;
 }
 export type ConceptConditionOperator =
-  "is" | "isNot" | "variantsMatch" | "variantsDoNotMatch";
+  | "is"
+  | "isNot"
+  | "variantsMatch"
+  | "variantsDoNotMatch";
 export interface CategoryCondition {
   categoryId: Id;
   operator: CompareOperator;
@@ -102,19 +105,15 @@ export interface Data {
   categories: Category[];
   concepts: Concept[];
 }
-export interface ResolvedConceptInstance {
+export interface ConceptInstance {
   id: Id;
-  conceptId: Id;
-  presetId: Id;
-  variantSelections: VariantSelection[];
-}
-export interface PresetSlot {
-  id: Id;
+  conceptId?: Id;
   presetId?: Id;
+  variantSelections: VariantSelection[];
 }
 export interface PromptGenerator {
   id: Id;
-  presetSlots: PresetSlot[];
+  instances: ConceptInstance[];
 }
 export interface PromptGeneratorsData {
   schemaVersion: 2;

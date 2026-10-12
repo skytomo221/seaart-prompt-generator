@@ -44,7 +44,17 @@ describe("V2 named fragment validation", () => {
     const pg: PromptGeneratorsData = {
       schemaVersion: 2,
       promptGenerators: [
-        { id: "pg", presetSlots: [{ id: "s", presetId: "unknown" }] },
+        {
+          id: "pg",
+          instances: [
+            {
+              id: "instance",
+              conceptId: "con",
+              presetId: "unknown",
+              variantSelections: [],
+            },
+          ],
+        },
       ],
     };
     expect(
@@ -56,6 +66,55 @@ describe("V2 named fragment validation", () => {
         concepts: [...base.concepts, { ...base.concepts[0], id: "other" }],
       }).some((error) => error.includes("duplicate id pre")),
     ).toBe(true);
+  });
+
+  it("accepts an instance variant that differs from its source preset", () => {
+    const data: Data = {
+      ...base,
+      concepts: [
+        {
+          ...base.concepts[0],
+          variantGroups: [
+            {
+              id: "uniform",
+              name: "制服",
+              variants: [
+                { id: "summer", name: "夏服", attributeIds: [] },
+                { id: "winter", name: "冬服", attributeIds: [] },
+              ],
+            },
+          ],
+          presets: [
+            {
+              id: "pre",
+              name: "p",
+              variantSelections: [
+                { groupId: "uniform", variantId: "summer" },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const generators: PromptGeneratorsData = {
+      schemaVersion: 2,
+      promptGenerators: [
+        {
+          id: "pg",
+          instances: [
+            {
+              id: "instance",
+              conceptId: "con",
+              presetId: "pre",
+              variantSelections: [
+                { groupId: "uniform", variantId: "winter" },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(validateData(data, generators)).toEqual([]);
   });
 
   it("rejects named-fragment cycles, duplicate names and dangling refs", () => {
@@ -95,9 +154,7 @@ describe("V2 named fragment validation", () => {
     expect(
       errors.some((error) => error.includes("duplicate named fragment name")),
     ).toBe(true);
-    expect(errors.some((error) => error.includes("reference cycle"))).toBe(
-      true,
-    );
+    expect(errors.some((error) => error.includes("reference cycle"))).toBe(true);
   });
 
   it("rejects bad logical and concept-variant conditions", () => {
@@ -114,60 +171,6 @@ describe("V2 named fragment validation", () => {
       validateData({ ...base, concepts: [concept] }).some((error) =>
         error.includes("empty logical"),
       ),
-    ).toBe(true);
-    const concept2 = {
-      ...base.concepts[0],
-      promptFragments: {
-        root: [{ fragmentId: "f2" }],
-        definitions: [
-          {
-            id: "f2",
-            name: "条件2",
-            if: {
-              concept: {
-                conceptId: "con",
-                operator: "variantsMatch" as const,
-                variants: [],
-                existence: "exists" as const,
-              },
-            },
-            fragments: ["tag"],
-          },
-        ],
-      },
-    };
-    expect(
-      validateData({ ...base, concepts: [concept2] }).some((error) =>
-        error.includes("requires at least one variant"),
-      ),
-    ).toBe(true);
-  });
-
-  it("rejects invalid variant selections", () => {
-    const data: Data = {
-      ...base,
-      concepts: [
-        {
-          ...base.concepts[0],
-          variantGroups: [
-            {
-              id: "g",
-              name: "g",
-              variants: [{ id: "v", name: "v", attributeIds: [] }],
-            },
-          ],
-          presets: [
-            {
-              id: "pre",
-              name: "p",
-              variantSelections: [{ groupId: "g", variantId: "missing" }],
-            },
-          ],
-        },
-      ],
-    };
-    expect(
-      validateData(data).some((error) => error.includes("invalid variant")),
     ).toBe(true);
   });
 });

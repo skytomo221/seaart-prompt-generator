@@ -60,6 +60,10 @@ function dataHasCondition(data: Data, field: string, id: string): boolean {
   );
 }
 
+function generatorInstances(generators: PromptGeneratorsData) {
+  return generators.promptGenerators.flatMap((generator) => generator.instances);
+}
+
 export function getDeletionReferences(
   kind: Kind,
   id: string,
@@ -68,15 +72,10 @@ export function getDeletionReferences(
   concept?: Data["concepts"][number],
 ): string[] {
   const refs: string[] = [];
+  const instances = generatorInstances(generators);
   if (kind === "concept") {
-    for (const preset of concept?.presets ?? []) {
-      if (
-        generators.promptGenerators.some((generator) =>
-          generator.presetSlots.some((slot) => slot.presetId === preset.id),
-        )
-      )
-        refs.push(`プリセット「${preset.name}」（プロンプト生成フォーム）`);
-    }
+    if (instances.some((instance) => instance.conceptId === id))
+      refs.push("プロンプト生成フォームのインスタンス");
     if (dataHasCondition(data, "conceptId", id))
       refs.push("名前付きフラグメントのコンセプト条件");
     for (const group of concept?.variantGroups ?? []) {
@@ -90,11 +89,7 @@ export function getDeletionReferences(
     }
   }
   if (kind === "preset") {
-    if (
-      generators.promptGenerators.some((generator) =>
-        generator.presetSlots.some((slot) => slot.presetId === id),
-      )
-    )
+    if (instances.some((instance) => instance.presetId === id))
       refs.push("プロンプト生成フォームで使用中");
     if (dataHasCondition(data, "presetId", id))
       refs.push("名前付きフラグメントのプリセット条件");
@@ -106,6 +101,12 @@ export function getDeletionReferences(
           preset.variantSelections.some((selection) => selection.groupId === id)
         )
           refs.push(`プリセット「${preset.name}」`);
+    if (
+      instances.some((instance) =>
+        instance.variantSelections.some((selection) => selection.groupId === id),
+      )
+    )
+      refs.push("プロンプト生成フォームのインスタンス");
     if (dataHasCondition(data, "groupId", id))
       refs.push("名前付きフラグメントのバリアントグループ条件");
   }
@@ -118,6 +119,14 @@ export function getDeletionReferences(
           )
         )
           refs.push(`プリセット「${preset.name}」`);
+    if (
+      instances.some((instance) =>
+        instance.variantSelections.some(
+          (selection) => selection.variantId === id,
+        ),
+      )
+    )
+      refs.push("プロンプト生成フォームのインスタンス");
     if (dataHasCondition(data, "variantId", id))
       refs.push("名前付きフラグメントのバリアント条件");
   }

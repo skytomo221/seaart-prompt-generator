@@ -1,5 +1,6 @@
 import {
   Condition,
+  ConceptInstance,
   Data,
   Id,
   InstanceExistence,
@@ -7,40 +8,32 @@ import {
   PromptFragment,
   PromptFragmentSet,
   PromptGenerator,
-  ResolvedConceptInstance,
   VariantRequirement,
 } from "../data";
 import { findPreset } from "./presets";
 
 export interface RuntimeInstance {
   key: string;
-  slotId: Id;
-  instance: ResolvedConceptInstance;
+  instance: ConceptInstance;
   preset: Preset;
   concept: Data["concepts"][number];
 }
 
-export function expandPresets(
+export function resolveInstances(
   generator: PromptGenerator,
   data: Data,
 ): RuntimeInstance[] {
   const result: RuntimeInstance[] = [];
-  for (const slot of generator.presetSlots) {
-    if (!slot.presetId) continue;
-    const resolved = findPreset(data, slot.presetId);
-    if (!resolved) continue;
-    const instance: ResolvedConceptInstance = {
-      id: slot.id,
-      conceptId: resolved.concept.id,
-      presetId: resolved.preset.id,
-      variantSelections: resolved.preset.variantSelections,
-    };
+  for (const instance of generator.instances) {
+    if (!instance.conceptId || !instance.presetId) continue;
+    const concept = data.concepts.find((item) => item.id === instance.conceptId);
+    const resolved = findPreset(data, instance.presetId);
+    if (!concept || !resolved || resolved.concept.id !== concept.id) continue;
     result.push({
-      key: slot.id,
-      slotId: slot.id,
+      key: instance.id,
       instance,
       preset: resolved.preset,
-      concept: resolved.concept,
+      concept,
     });
   }
   return result;
@@ -199,7 +192,7 @@ export function evaluateConceptInstance(
 }
 
 export function evaluatePrompt(generator: PromptGenerator, data: Data) {
-  const environment = expandPresets(generator, data);
+  const environment = resolveInstances(generator, data);
   const positive: string[] = [];
   const negative: string[] = [];
   for (const item of environment) {

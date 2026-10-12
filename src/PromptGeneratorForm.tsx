@@ -28,12 +28,13 @@ import {
 } from "@dnd-kit/sortable";
 import { Fragment, useState } from "react";
 import { v4 as uuid } from "uuid";
-import { Data, PresetSlot, PromptGenerator } from "./data";
+import { ConceptInstance, Data, PromptGenerator } from "./data";
 import { evaluatePrompt } from "./domain/evaluatePrompt";
+import { findPreset } from "./domain/presets";
 import InsertButton from "./InsertButton";
 import PresetSelect from "./PresetSelect";
 import ResultText from "./ResultText";
-import SortablePreset from "./SortablePreset";
+import SortableInstance from "./SortableInstance";
 
 const NEW_INSTANCE_DRAG_ID = "__new-prompt-instance";
 const DELETE_INSTANCE_DROP_ID = "__delete-prompt-instance";
@@ -153,15 +154,15 @@ function AddInstanceDragOverlay() {
 }
 
 function ExistingInstanceDragOverlay({
-  slot,
+  instance,
   data,
 }: {
-  slot: PresetSlot;
+  instance: ConceptInstance;
   data: Data;
 }) {
   return (
     <div
-      className="sortable-preset"
+      className="instance-main-row"
       style={{ width: "100%", cursor: "grabbing", pointerEvents: "none" }}
     >
       <Button
@@ -170,7 +171,11 @@ function ExistingInstanceDragOverlay({
         size="small"
         tabIndex={-1}
       />
-      <PresetSelect slot={slot} data={data} onChange={() => {}} />
+      <PresetSelect
+        presetId={instance.presetId}
+        data={data}
+        onChange={() => {}}
+      />
     </div>
   );
 }
@@ -233,21 +238,55 @@ export default function PromptGeneratorForm({
     onChange(fn(generator));
   const insert = (at: number) =>
     update((g) => {
-      const slots = [...g.presetSlots];
-      slots.splice(at, 0, { id: uuid() });
-      return { ...g, presetSlots: slots };
+      const instances = [...g.instances];
+      instances.splice(at, 0, { id: uuid(), variantSelections: [] });
+      return { ...g, instances };
     });
   const moveToInsertionPoint = (activeId: string, insertionIndex: number) =>
     update((g) => {
-      const from = g.presetSlots.findIndex((s) => s.id === activeId);
+      const from = g.instances.findIndex((instance) => instance.id === activeId);
       if (from < 0) return g;
-      const slots = [...g.presetSlots];
-      const [slot] = slots.splice(from, 1);
-      let to = Math.max(0, Math.min(insertionIndex, g.presetSlots.length));
+      const instances = [...g.instances];
+      const [instance] = instances.splice(from, 1);
+      let to = Math.max(0, Math.min(insertionIndex, g.instances.length));
       if (from < to) to -= 1;
-      slots.splice(to, 0, slot);
-      return { ...g, presetSlots: slots };
+      instances.splice(to, 0, instance);
+      return { ...g, instances };
     });
+  const setPreset = (instanceId: string, presetId?: string) =>
+    update((g) => ({
+      ...g,
+      instances: g.instances.map((instance) => {
+        if (instance.id !== instanceId) return instance;
+        if (!presetId) return { id: instance.id, variantSelections: [] };
+        const resolved = findPreset(data, presetId);
+        if (!resolved) return instance;
+        return {
+          id: instance.id,
+          conceptId: resolved.concept.id,
+          presetId: resolved.preset.id,
+          variantSelections: resolved.preset.variantSelections.map((selection) => ({
+            ...selection,
+          })),
+        };
+      }),
+    }));
+  const setVariant = (
+    instanceId: string,
+    groupId: string,
+    variantId?: string,
+  ) =>
+    update((g) => ({
+      ...g,
+      instances: g.instances.map((instance) => {
+        if (instance.id !== instanceId) return instance;
+        const variantSelections = instance.variantSelections.filter(
+          (selection) => selection.groupId !== groupId,
+        );
+        if (variantId) variantSelections.push({ groupId, variantId });
+        return { ...instance, variantSelections };
+      }),
+    }));
   const collisionDetection: CollisionDetection = (args) => {
     if (args.active.data.current?.type === "new-instance") {
       return pointerWithin({
@@ -263,53 +302,55 @@ export default function PromptGeneratorForm({
     setActiveDragKind(null);
     setActiveDragId(null);
   };
-  const dragStart = (e: DragStartEvent) => {
+  const dragStart = (event: DragStartEvent) => {
     const kind =
-      e.active.data.current?.type === "new-instance"
+      event.active.data.current?.type === "new-instance"
         ? "new-instance"
         : "instance";
     setActiveDragKind(kind);
-    setActiveDragId(kind === "instance" ? String(e.active.id) : null);
+    setActiveDragId(kind === "instance" ? String(event.active.id) : null);
   };
-  const drag = (e: DragEndEvent) => {
+  const drag = (event: DragEndEvent) => {
     clearDrag();
-    if (!e.over) return;
+    if (!event.over) return;
 
-    const kind = e.active.data.current?.type as DragKind | undefined;
-    const overType = e.over.data.current?.type;
-    const activeId = String(e.active.id);
+    const kind = event.active.data.current?.type as DragKind | undefined;
+    const overType = event.over.data.current?.type;
+    const activeId = String(event.active.id);
 
     if (kind === "new-instance") {
       if (overType === "insert") {
-        insert(Number(e.over.data.current?.index));
+        insert(Number(event.over.data.current?.index));
       }
       return;
     }
 
     if (kind !== "instance") return;
-    if (e.over.id === DELETE_INSTANCE_DROP_ID) {
+    if (event.over.id === DELETE_INSTANCE_DROP_ID) {
       update((g) => ({
         ...g,
-        presetSlots: g.presetSlots.filter((s) => s.id !== activeId),
+        instances: g.instances.filter((instance) => instance.id !== activeId),
       }));
       return;
     }
     if (overType === "insert") {
-      moveToInsertionPoint(activeId, Number(e.over.data.current?.index));
+      moveToInsertionPoint(activeId, Number(event.over.data.current?.index));
       return;
     }
-    if (e.active.id === e.over.id) return;
+    if (event.active.id === event.over.id) return;
 
-    const a = generator.presetSlots.findIndex((s) => s.id === activeId);
-    const b = generator.presetSlots.findIndex(
-      (s) => s.id === String(e.over.id),
+    const from = generator.instances.findIndex(
+      (instance) => instance.id === activeId,
     );
-    if (a >= 0 && b >= 0)
-      update((g) => ({ ...g, presetSlots: arrayMove(g.presetSlots, a, b) }));
+    const to = generator.instances.findIndex(
+      (instance) => instance.id === String(event.over!.id),
+    );
+    if (from >= 0 && to >= 0)
+      update((g) => ({ ...g, instances: arrayMove(g.instances, from, to) }));
   };
   const out = evaluatePrompt(generator, data);
-  const activeSlot = activeDragId
-    ? generator.presetSlots.find((slot) => slot.id === activeDragId)
+  const activeInstance = activeDragId
+    ? generator.instances.find((instance) => instance.id === activeDragId)
     : undefined;
   const formTransformStyle = formTransform
     ? `translate3d(${formTransform.x}px, ${formTransform.y}px, 0)`
@@ -360,7 +401,7 @@ export default function PromptGeneratorForm({
           onDragEnd={drag}
         >
           <SortableContext
-            items={generator.presetSlots.map((s) => s.id)}
+            items={generator.instances.map((instance) => instance.id)}
             strategy={verticalListSortingStrategy}
           >
             <InstanceInsertTarget
@@ -368,37 +409,36 @@ export default function PromptGeneratorForm({
               onClick={() => insert(0)}
               newInstanceDragging={activeDragKind === "new-instance"}
             />
-            {generator.presetSlots.map((slot, i) => (
-              <Fragment key={slot.id}>
-                <SortablePreset
-                  slot={slot}
+            {generator.instances.map((instance, instanceIndex) => (
+              <Fragment key={instance.id}>
+                <SortableInstance
+                  instance={instance}
                   data={data}
-                  onChange={(id) =>
-                    update((g) => ({
-                      ...g,
-                      presetSlots: g.presetSlots.map((s) =>
-                        s.id === slot.id ? { ...s, presetId: id } : s,
-                      ),
-                    }))
+                  onPresetChange={(presetId) =>
+                    setPreset(instance.id, presetId)
+                  }
+                  onVariantChange={(groupId, variantId) =>
+                    setVariant(instance.id, groupId, variantId)
                   }
                 />
                 <InstanceInsertTarget
-                  index={i + 1}
-                  onClick={() => insert(i + 1)}
+                  index={instanceIndex + 1}
+                  onClick={() => insert(instanceIndex + 1)}
                   newInstanceDragging={activeDragKind === "new-instance"}
                 />
               </Fragment>
             ))}
           </SortableContext>
-          <AddInstanceButton
-            onClick={() => insert(generator.presetSlots.length)}
-          />
+          <AddInstanceButton onClick={() => insert(generator.instances.length)} />
           {activeDragKind === "instance" && <DeleteInstanceDropZone />}
           <DragOverlay dropAnimation={null}>
             {activeDragKind === "new-instance" ? (
               <AddInstanceDragOverlay />
-            ) : activeDragKind === "instance" && activeSlot ? (
-              <ExistingInstanceDragOverlay slot={activeSlot} data={data} />
+            ) : activeDragKind === "instance" && activeInstance ? (
+              <ExistingInstanceDragOverlay
+                instance={activeInstance}
+                data={data}
+              />
             ) : null}
           </DragOverlay>
         </DndContext>

@@ -144,6 +144,36 @@ export function validateData(
     }
   }
 
+  const checkSelections = (owner: string, concept: any, selections: any) => {
+    if (!Array.isArray(selections)) {
+      errors.push(`${owner}: variantSelections must be an array`);
+      return;
+    }
+    const used = new Set<string>();
+    for (const selection of selections) {
+      if (used.has(selection.groupId))
+        errors.push(`${owner} repeats group ${selection.groupId}`);
+      used.add(selection.groupId);
+      const group = (concept.variantGroups ?? []).find(
+        (candidate: any) => candidate.id === selection.groupId,
+      );
+      if (!group) {
+        errors.push(`${owner} has missing group ${selection.groupId}`);
+        continue;
+      }
+      if (typeof selection.variantId !== "string") {
+        errors.push(`${owner}: variantId must be a string`);
+        continue;
+      }
+      if (
+        !group.variants.some(
+          (variant: any) => variant.id === selection.variantId,
+        )
+      )
+        errors.push(`${owner} has invalid variant ${selection.variantId}`);
+    }
+  };
+
   const checkCondition = (condition: any, owner: string): void => {
     if (
       !condition ||
@@ -322,39 +352,8 @@ export function validateData(
       concept.negativePromptFragments,
       `Concept ${concept.id} negativePromptFragments`,
     );
-    for (const preset of concept.presets ?? []) {
-      if (!Array.isArray(preset.variantSelections)) {
-        errors.push(`Preset ${preset.id}: variantSelections must be an array`);
-        continue;
-      }
-      const used = new Set<string>();
-      for (const selection of preset.variantSelections) {
-        if (used.has(selection.groupId))
-          errors.push(`Preset ${preset.id} repeats group ${selection.groupId}`);
-        used.add(selection.groupId);
-        const group = (concept.variantGroups ?? []).find(
-          (candidate: any) => candidate.id === selection.groupId,
-        );
-        if (!group) {
-          errors.push(
-            `Preset ${preset.id} has missing group ${selection.groupId}`,
-          );
-          continue;
-        }
-        if (typeof selection.variantId !== "string") {
-          errors.push(`Preset ${preset.id}: variantId must be a string`);
-          continue;
-        }
-        if (
-          !group.variants.some(
-            (variant: any) => variant.id === selection.variantId,
-          )
-        )
-          errors.push(
-            `Preset ${preset.id} has invalid variant ${selection.variantId}`,
-          );
-      }
-    }
+    for (const preset of concept.presets ?? [])
+      checkSelections(`Preset ${preset.id}`, concept, preset.variantSelections);
   }
 
   if (generatorInput !== undefined) {
@@ -365,18 +364,28 @@ export function validateData(
       errors.push("promptGenerators must be an array");
     for (const generator of generators.promptGenerators ?? []) {
       addId(generator, "prompt generator");
-      if (!Array.isArray(generator.presetSlots)) {
-        errors.push(
-          `PromptGenerator ${generator.id}: presetSlots must be an array`,
-        );
+      if (!Array.isArray(generator.instances)) {
+        errors.push(`PromptGenerator ${generator.id}: instances must be an array`);
         continue;
       }
-      for (const slot of generator.presetSlots) {
-        addId(slot, "preset slot");
-        if (slot.presetId !== undefined && !presetIds.has(slot.presetId))
-          errors.push(
-            `PromptGenerator ${generator.id} references missing preset ${String(slot.presetId)}`,
-          );
+      for (const instance of generator.instances) {
+        addId(instance, "concept instance");
+        if (instance.conceptId === undefined && instance.presetId === undefined) {
+          checkSelections(`Instance ${instance.id}`, { variantGroups: [] }, instance.variantSelections);
+          continue;
+        }
+        if (typeof instance.conceptId !== "string" || !conceptIds.has(instance.conceptId)) {
+          errors.push(`Instance ${instance.id} references missing concept ${String(instance.conceptId)}`);
+          continue;
+        }
+        if (typeof instance.presetId !== "string" || !presetIds.has(instance.presetId)) {
+          errors.push(`Instance ${instance.id} references missing preset ${String(instance.presetId)}`);
+          continue;
+        }
+        const concept = concepts.find((item) => item.id === instance.conceptId);
+        if (!concept?.presets.some((preset: any) => preset.id === instance.presetId))
+          errors.push(`Instance ${instance.id} preset does not belong to its concept`);
+        checkSelections(`Instance ${instance.id}`, concept, instance.variantSelections);
       }
     }
   }

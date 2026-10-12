@@ -1,26 +1,23 @@
 import { MenuItem } from "@blueprintjs/core";
 import { Suggest, type ItemRenderer } from "@blueprintjs/select";
-import { Data, PresetSlot } from "./data";
+import { Data, Id } from "./data";
 import { allPresets } from "./domain/presets";
 
 export default function PresetSelect({
-  slot,
+  presetId,
   data,
   onChange,
 }: {
-  slot: PresetSlot;
+  presetId?: Id;
   data: Data;
   onChange: (id?: string) => void;
 }) {
   const options = allPresets(data).map(({ concept, preset }) => ({
     id: preset.id,
-    label:
-      preset.name === concept.name
-        ? concept.name
-        : `${concept.name}（${preset.name}）`,
+    label: preset.name,
     category: data.categories.find((c) => c.id === concept.categoryId),
   }));
-  const chosen = options.find((x) => x.id === slot.presetId);
+  const chosen = options.find((x) => x.id === presetId);
   type Item = (typeof options)[number] | { id: "__blank"; label: string };
   const blank: Item = { id: "__blank", label: "空白" };
   const items: Item[] = [blank, ...options];

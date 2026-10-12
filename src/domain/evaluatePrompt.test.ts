@@ -63,7 +63,10 @@ const d: Data = {
         {
           id: "g",
           name: "style",
-          variants: [{ id: "v", name: "one", attributeIds: ["life"] }],
+          variants: [
+            { id: "v", name: "one", attributeIds: ["life"] },
+            { id: "v2", name: "two", attributeIds: [] },
+          ],
         },
       ],
       presets: [preset("pb", [{ groupId: "g", variantId: "v" }])],
@@ -82,9 +85,25 @@ const d: Data = {
     },
   ],
 };
+
 const gen = (ids: string[]): PromptGenerator => ({
   id: "pg",
-  presetSlots: ids.map((id, index) => ({ id: `slot-${index}`, presetId: id })),
+  instances: ids.map((presetId, index) => {
+    for (const concept of d.concepts) {
+      const found = concept.presets.find((item) => item.id === presetId);
+      if (found) {
+        return {
+          id: `instance-${index}`,
+          conceptId: concept.id,
+          presetId,
+          variantSelections: found.variantSelections.map((selection) => ({
+            ...selection,
+          })),
+        };
+      }
+    }
+    throw new Error(`missing preset ${presetId}`);
+  }),
 });
 
 describe("V2 named fragment evaluator", () => {
@@ -170,14 +189,50 @@ describe("V2 named fragment evaluator", () => {
     expect(evaluatePrompt(gen(["pa"]), x).prompt).toBe("nested");
   });
 
-  it("creates distinct runtime instances per repeated slot and retains slot order", () => {
+  it("creates distinct runtime instances per repeated preset and retains order", () => {
     const out = evaluatePrompt(gen(["pa", "pb", "pa"]), d);
     expect(out.environment.map((item) => item.instance.id)).toEqual([
-      "slot-0",
-      "slot-1",
-      "slot-2",
+      "instance-0",
+      "instance-1",
+      "instance-2",
     ]);
     expect(out.prompt).toBe("same,same,same,same");
+  });
+
+  it("uses independently edited instance variants instead of preset defaults", () => {
+    const generator = gen(["pb"]);
+    generator.instances[0].variantSelections = [
+      { groupId: "g", variantId: "v2" },
+    ];
+    const out = evaluatePrompt(generator, d);
+    expect(
+      evaluateCondition(
+        {
+          concept: {
+            conceptId: "b",
+            operator: "variantsMatch",
+            variants: [{ groupId: "g", variantId: "v" }],
+            existence: "exists",
+          },
+        },
+        out.environment,
+        d,
+      ),
+    ).toBe(false);
+    expect(
+      evaluateCondition(
+        {
+          concept: {
+            conceptId: "b",
+            operator: "variantsMatch",
+            variants: [{ groupId: "g", variantId: "v2" }],
+            existence: "exists",
+          },
+        },
+        out.environment,
+        d,
+      ),
+    ).toBe(true);
   });
 
   it("separates per-instance comparison from existence", () => {
@@ -302,7 +357,11 @@ describe("V2 named fragment evaluator", () => {
     expect(
       evaluateCondition(
         {
-          category: { categoryId: "char", operator: "is", existence: "exists" },
+          category: {
+            categoryId: "char",
+            operator: "is",
+            existence: "exists",
+          },
         },
         out.environment,
         x,
@@ -342,7 +401,11 @@ describe("V2 named fragment evaluator", () => {
         {
           all: [
             {
-              concept: { conceptId: "a", operator: "is", existence: "exists" },
+              concept: {
+                conceptId: "a",
+                operator: "is",
+                existence: "exists",
+              },
             },
             {
               attribute: {
@@ -362,10 +425,18 @@ describe("V2 named fragment evaluator", () => {
         {
           any: [
             {
-              concept: { conceptId: "x", operator: "is", existence: "exists" },
+              concept: {
+                conceptId: "x",
+                operator: "is",
+                existence: "exists",
+              },
             },
             {
-              concept: { conceptId: "a", operator: "is", existence: "exists" },
+              concept: {
+                conceptId: "a",
+                operator: "is",
+                existence: "exists",
+              },
             },
           ],
         },

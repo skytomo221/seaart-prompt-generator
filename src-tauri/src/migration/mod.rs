@@ -1,4 +1,5 @@
 pub mod condition_existence;
+pub mod prompt_generator_instances;
 pub mod v1_to_v2;
 pub mod variant_single_selection;
 use serde_json::Value;
@@ -10,5 +11,7 @@ pub fn migrate_data(v: &Value, mixed_generators: Option<&Value>) -> Result<Value
     Ok(data)
 }
 pub fn migrate_generators(v: &Value, data: &Value) -> Result<Value, String> {
-    v1_to_v2::migrate_generators(v, data)
+    let mut generators = v1_to_v2::migrate_generators(v, data)?;
+    prompt_generator_instances::migrate_generators(&mut generators, data)?;
+    Ok(generators)
 }

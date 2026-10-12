@@ -30,24 +30,38 @@ export default function PromptGeneratorsTab({
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
-  const add = () => onChange([...generators, { id: uuid(), presetSlots: [] }]);
+  const add = () => onChange([...generators, { id: uuid(), instances: [] }]);
   const clone = (source: number, at: number) => {
     const original = generators[source];
     if (!original) return;
     const copy = {
       id: uuid(),
-      presetSlots: original.presetSlots.map((s) => ({ ...s, id: uuid() })),
+      instances: original.instances.map((instance) => ({
+        ...instance,
+        id: uuid(),
+        variantSelections: instance.variantSelections.map((selection) => ({
+          ...selection,
+        })),
+      })),
     };
     onChange([...generators.slice(0, at), copy, ...generators.slice(at)]);
   };
-  const change = (g: PromptGenerator) =>
-    onChange(generators.map((x) => (x.id === g.id ? g : x)));
+  const change = (generator: PromptGenerator) =>
+    onChange(
+      generators.map((item) =>
+        item.id === generator.id ? generator : item,
+      ),
+    );
   const remove = (id: string) =>
-    onChange(generators.filter((x) => x.id !== id));
-  const reorder = (e: DragEndEvent) => {
-    if (!e.over || e.active.id === e.over.id) return;
-    const from = generators.findIndex((g) => g.id === String(e.active.id));
-    const to = generators.findIndex((g) => g.id === String(e.over!.id));
+    onChange(generators.filter((item) => item.id !== id));
+  const reorder = (event: DragEndEvent) => {
+    if (!event.over || event.active.id === event.over.id) return;
+    const from = generators.findIndex(
+      (generator) => generator.id === String(event.active.id),
+    );
+    const to = generators.findIndex(
+      (generator) => generator.id === String(event.over!.id),
+    );
     if (from >= 0 && to >= 0) onChange(arrayMove(generators, from, to));
   };
 
@@ -60,19 +74,19 @@ export default function PromptGeneratorsTab({
           onDragEnd={reorder}
         >
           <SortableContext
-            items={generators.map((g) => g.id)}
+            items={generators.map((generator) => generator.id)}
             strategy={horizontalListSortingStrategy}
           >
             <AnimatePresence initial={false}>
-              {generators.map((g, i) => (
-                <motion.div key={g.id}>
+              {generators.map((generator, index) => (
+                <motion.div key={generator.id}>
                   <PromptGeneratorForm
-                    generator={g}
-                    index={i}
+                    generator={generator}
+                    index={index}
                     data={data}
                     onChange={change}
                     onClone={clone}
-                    onDelete={() => remove(g.id)}
+                    onDelete={() => remove(generator.id)}
                   />
                 </motion.div>
               ))}

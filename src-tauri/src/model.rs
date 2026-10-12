@@ -187,17 +187,20 @@ pub enum Condition {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PresetSlot {
+pub struct ConceptInstance {
     pub id: Id,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub concept_id: Option<Id>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub preset_id: Option<Id>,
+    pub variant_selections: Vec<VariantSelection>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PromptGenerator {
     pub id: Id,
-    pub preset_slots: Vec<PresetSlot>,
+    pub instances: Vec<ConceptInstance>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
