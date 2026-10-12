@@ -1,19 +1,19 @@
-import { useRef } from "react";
+import type { MutableRefObject } from "react";
 import { v4 as uuid } from "uuid";
 import { Concept, Data, PromptGeneratorsData } from "./data";
 import ConceptList from "./ConceptList";
 import ConceptEditor from "./ConceptEditor";
 import { getDeletionReferences } from "./domain/references";
 
-export default function ConceptsTab({ data, onChange, generators, selectedId, onSelect, onError }: {
+export default function ConceptsTab({ data, onChange, generators, selectedId, onSelect, onError, scrollTopRef }: {
   data: Data;
   onChange: (d: Data) => void;
   generators: PromptGeneratorsData;
   selectedId: string;
   onSelect: (id: string) => void;
   onError: (message: string) => void;
+  scrollTopRef: MutableRefObject<number>;
 }) {
-  const scroll = useRef(0);
   const add = (at: number) => {
     const concept: Concept = {
       id: uuid(),
@@ -47,7 +47,7 @@ export default function ConceptsTab({ data, onChange, generators, selectedId, on
     return [concept.id, category ? { color: category.color, backgroundColor: category.backgroundColor } : undefined] as const;
   }));
   return <div className="tab-content editor-tab-content">
-    <ConceptList items={data.concepts} selectedId={selectedId} onSelect={onSelect} onAdd={add} scrollTopRef={scroll} itemStyles={itemStyles} onReorder={items => onChange({ ...data, concepts: items.map(item => data.concepts.find(concept => concept.id === item.id)!) })} />
+    <ConceptList items={data.concepts} selectedId={selectedId} onSelect={onSelect} onAdd={add} scrollTopRef={scrollTopRef} itemStyles={itemStyles} onReorder={items => onChange({ ...data, concepts: items.map(item => data.concepts.find(concept => concept.id === item.id)!) })} />
     <div className="editor-detail-pane">{selected ? <ConceptEditor concept={selected} data={data} onChange={update} onDelete={() => remove("concept", selected.id)} onDeletePreset={id => remove("preset", id)} onDeleteGroup={id => remove("variantGroup", id)} onDeleteVariant={id => remove("variant", id)} /> : <div className="editor-empty-state">コンセプトを選択してください</div>}</div>
   </div>;
 }
