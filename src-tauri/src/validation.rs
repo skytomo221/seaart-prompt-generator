@@ -141,16 +141,6 @@ pub fn validate_pair(data_value: &Value, generators_value: &Value) -> Result<(),
             }
         }
         for group in &concept.variant_groups {
-            if group.min_selections > group.variants.len()
-                || group
-                    .max_selections
-                    .is_some_and(|max| max < group.min_selections)
-            {
-                errors.push(format!(
-                    "VariantGroup {} has invalid selection limits",
-                    group.id
-                ));
-            }
             for variant in &group.variants {
                 for id in &variant.attribute_ids {
                     if !attr_ids.contains(id) {
@@ -182,38 +172,13 @@ pub fn validate_pair(data_value: &Value, generators_value: &Value) -> Result<(),
                     ));
                     continue;
                 };
-                let unique: HashSet<&String> = selection.variant_ids.iter().collect();
-                if unique.len() != selection.variant_ids.len() {
-                    errors.push(format!(
-                        "Preset {} has duplicate Variant in group {}",
-                        preset.id, group.id
-                    ));
-                }
-                if selection
-                    .variant_ids
+                if !group
+                    .variants
                     .iter()
-                    .any(|id| !group.variants.iter().any(|variant| variant.id == *id))
+                    .any(|variant| variant.id == selection.variant_id)
                 {
                     errors.push(format!(
                         "Preset {} references invalid Variant in group {}",
-                        preset.id, group.id
-                    ));
-                }
-                if selection.variant_ids.len() < group.min_selections
-                    || group
-                        .max_selections
-                        .is_some_and(|max| selection.variant_ids.len() > max)
-                {
-                    errors.push(format!(
-                        "Preset {} violates VariantGroup {} selection rules",
-                        preset.id, group.id
-                    ));
-                }
-            }
-            for group in &concept.variant_groups {
-                if group.min_selections > 0 && !used_groups.contains(&group.id) {
-                    errors.push(format!(
-                        "Preset {} misses required VariantGroup {}",
                         preset.id, group.id
                     ));
                 }
@@ -525,5 +490,19 @@ mod tests {
         assert!(validate_pair(&data, &generators)
             .unwrap_err()
             .contains("missing Preset"));
+    }
+    #[test]
+    fn rejects_invalid_variant_selection() {
+        let (mut data, generators) = valid();
+        data["concepts"][0]["variantGroups"] = json!([{
+            "id":"g",
+            "name":"制服",
+            "variants":[{"id":"summer","name":"夏服","attributeIds":[]}]
+        }]);
+        data["concepts"][0]["presets"][0]["variantSelections"] =
+            json!([{"groupId":"g","variantId":"missing"}]);
+        assert!(validate_pair(&data, &generators)
+            .unwrap_err()
+            .contains("invalid Variant"));
     }
 }

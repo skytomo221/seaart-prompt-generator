@@ -63,12 +63,10 @@ const d: Data = {
         {
           id: "g",
           name: "style",
-          minSelections: 0,
-          maxSelections: 2,
           variants: [{ id: "v", name: "one", attributeIds: ["life"] }],
         },
       ],
-      presets: [preset("pb", [{ groupId: "g", variantIds: ["v"] }])],
+      presets: [preset("pb", [{ groupId: "g", variantId: "v" }])],
       promptFragments: emptySet(),
       negativePromptFragments: emptySet(),
     },

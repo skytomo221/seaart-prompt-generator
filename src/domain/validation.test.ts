@@ -143,47 +143,31 @@ describe("V2 named fragment validation", () => {
     ).toBe(true);
   });
 
-  it("validates VariantGroup limits and selections", () => {
-    const concept = {
-      ...base.concepts[0],
-      variantGroups: [
-        {
-          id: "g",
-          name: "g",
-          minSelections: 1,
-          maxSelections: 1,
-          variants: [{ id: "v", name: "v", attributeIds: [] }],
-        },
-      ],
-    };
-    const data = {
+  it("rejects invalid variant selections", () => {
+    const data: Data = {
       ...base,
       concepts: [
         {
-          ...concept,
+          ...base.concepts[0],
+          variantGroups: [
+            {
+              id: "g",
+              name: "g",
+              variants: [{ id: "v", name: "v", attributeIds: [] }],
+            },
+          ],
           presets: [
             {
               id: "pre",
               name: "p",
-              variantSelections: [{ groupId: "g", variantIds: ["v", "v"] }],
+              variantSelections: [{ groupId: "g", variantId: "missing" }],
             },
           ],
         },
       ],
     };
     expect(
-      validateData(data).some((error) => error.includes("duplicate variant")),
-    ).toBe(true);
-    expect(
-      validateData({
-        ...base,
-        concepts: [
-          {
-            ...concept,
-            presets: [{ id: "pre", name: "p", variantSelections: [] }],
-          },
-        ],
-      }).some((error) => error.includes("missing required selection")),
+      validateData(data).some((error) => error.includes("invalid variant")),
     ).toBe(true);
   });
 });

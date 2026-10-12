@@ -60,11 +60,9 @@ export function getEffectiveAttributes(
     const group = item.concept.variantGroups.find(
       (candidate) => candidate.id === selection.groupId,
     );
-    for (const id of selection.variantIds) {
-      group?.variants
-        .find((variant) => variant.id === id)
-        ?.attributeIds.forEach((attributeId) => ids.add(attributeId));
-    }
+    group?.variants
+      .find((variant) => variant.id === selection.variantId)
+      ?.attributeIds.forEach((attributeId) => ids.add(attributeId));
   }
   const pending = [...ids];
   while (pending.length) {
@@ -87,9 +85,9 @@ function matchesVariantRequirements(
 ): boolean {
   return requirements.every(
     (requirement) =>
-      item.instance.variantSelections
-        .find((selection) => selection.groupId === requirement.groupId)
-        ?.variantIds.includes(requirement.variantId) === true,
+      item.instance.variantSelections.find(
+        (selection) => selection.groupId === requirement.groupId,
+      )?.variantId === requirement.variantId,
   );
 }
 

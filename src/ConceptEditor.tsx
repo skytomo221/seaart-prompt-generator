@@ -44,24 +44,19 @@ export default function ConceptEditor({
     });
   const selection = (preset: Concept["presets"][number], groupId: string) =>
     preset.variantSelections.find((item) => item.groupId === groupId)
-      ?.variantIds ?? [];
+      ?.variantId;
   const changeSelection = (
     presetId: string,
     groupId: string,
-    variantId: string,
-    checked: boolean,
+    variantId?: string,
   ) =>
     patch({
       presets: concept.presets.map((preset) => {
         if (preset.id !== presetId) return preset;
-        const chosen = selection(preset, groupId).filter(
-          (id) => id !== variantId,
-        );
-        if (checked) chosen.push(variantId);
         const selections = preset.variantSelections.filter(
           (item) => item.groupId !== groupId,
         );
-        if (chosen.length) selections.push({ groupId, variantIds: chosen });
+        if (variantId) selections.push({ groupId, variantId });
         return { ...preset, variantSelections: selections };
       }),
     });
@@ -97,9 +92,6 @@ export default function ConceptEditor({
           concept.variantGroups.map((group) => (
             <Card key={group.id} compact className="editor-card">
               <div>{group.name || "名称未設定"}</div>
-              <div className="detail-view-muted">
-                選択数: {group.minSelections}〜{group.maxSelections ?? "無制限"}
-              </div>
               {group.variants.length ? (
                 <ul className="detail-view-list">
                   {group.variants.map((variant) => (
@@ -137,15 +129,13 @@ export default function ConceptEditor({
                     const group = concept.variantGroups.find(
                       (g) => g.id === item.groupId,
                     );
-                    const names = item.variantIds
-                      .map(
-                        (id) =>
-                          group?.variants.find((v) => v.id === id)?.name ?? id,
-                      )
-                      .join("、");
+                    const variantId = item.variantId;
+                    const name =
+                      group?.variants.find((v) => v.id === variantId)?.name ??
+                      variantId;
                     return (
                       <li key={item.groupId}>
-                        {group?.name ?? item.groupId}: {names || "未設定"}
+                        {group?.name ?? item.groupId}: {name || "未設定"}
                       </li>
                     );
                   })}
@@ -224,41 +214,6 @@ export default function ConceptEditor({
                 }))
               }
             />
-            <div className="inline-fields">
-              <FormGroup label="最小選択数">
-                <InputGroup
-                  type="number"
-                  min="0"
-                  value={String(group.minSelections)}
-                  onChange={(event) =>
-                    setGroup(group.id, (current) => ({
-                      ...current,
-                      minSelections: Number(event.currentTarget.value),
-                    }))
-                  }
-                />
-              </FormGroup>
-              <FormGroup label="最大選択数（空欄は無制限）">
-                <InputGroup
-                  type="number"
-                  min="0"
-                  value={
-                    group.maxSelections === undefined
-                      ? ""
-                      : String(group.maxSelections)
-                  }
-                  onChange={(event) =>
-                    setGroup(group.id, (current) => ({
-                      ...current,
-                      maxSelections:
-                        event.currentTarget.value === ""
-                          ? undefined
-                          : Number(event.currentTarget.value),
-                    }))
-                  }
-                />
-              </FormGroup>
-            </div>
             {group.variants.map((variant) => (
               <div className="variant-edit" key={variant.id}>
                 <FormGroup label="バリアント名">
@@ -340,7 +295,6 @@ export default function ConceptEditor({
                 {
                   id: uuid(),
                   name: "新しいバリアントグループ",
-                  minSelections: 0,
                   variants: [],
                 },
               ],
@@ -406,38 +360,27 @@ export default function ConceptEditor({
             {concept.variantGroups.map((group) => (
               <FormGroup
                 key={group.id}
-                label={`${group.name}（${group.minSelections}〜${group.maxSelections ?? "無制限"}）`}
+                label={group.name}
                 className="preset-variant-group"
               >
-                {group.variants.map((variant) => {
-                  const selected = selection(preset, group.id).includes(
-                    variant.id,
-                  );
-                  const count = selection(preset, group.id).length;
-                  const atMax =
-                    group.maxSelections !== undefined &&
-                    count >= group.maxSelections;
-                  return (
-                    <label key={variant.id}>
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        disabled={
-                          selected ? count <= group.minSelections : atMax
-                        }
-                        onChange={(event) =>
-                          changeSelection(
-                            preset.id,
-                            group.id,
-                            variant.id,
-                            event.currentTarget.checked,
-                          )
-                        }
-                      />
+                <HTMLSelect
+                  fill
+                  value={selection(preset, group.id) ?? ""}
+                  onChange={(event) =>
+                    changeSelection(
+                      preset.id,
+                      group.id,
+                      event.currentTarget.value || undefined,
+                    )
+                  }
+                >
+                  <option value="">未選択</option>
+                  {group.variants.map((variant) => (
+                    <option key={variant.id} value={variant.id}>
                       {variant.name}
-                    </label>
-                  );
-                })}
+                    </option>
+                  ))}
+                </HTMLSelect>
               </FormGroup>
             ))}
           </Card>

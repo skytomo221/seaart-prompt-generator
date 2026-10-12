@@ -21,13 +21,11 @@ export interface Variant {
 export interface VariantGroup {
   id: Id;
   name: string;
-  minSelections: number;
-  maxSelections?: number;
   variants: Variant[];
 }
 export interface VariantSelection {
   groupId: Id;
-  variantIds: Id[];
+  variantId: Id;
 }
 export interface Preset {
   id: Id;

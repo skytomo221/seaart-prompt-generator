@@ -6,7 +6,12 @@ import {
 } from "../data";
 
 type Kind =
-  "concept" | "category" | "attribute" | "preset" | "variantGroup" | "variant";
+  | "concept"
+  | "category"
+  | "attribute"
+  | "preset"
+  | "variantGroup"
+  | "variant";
 
 function conditionHas(
   condition: Condition,
@@ -108,8 +113,8 @@ export function getDeletionReferences(
     for (const owner of data.concepts)
       for (const preset of owner.presets)
         if (
-          preset.variantSelections.some((selection) =>
-            selection.variantIds.includes(id),
+          preset.variantSelections.some(
+            (selection) => selection.variantId === id,
           )
         )
           refs.push(`プリセット「${preset.name}」`);
@@ -131,8 +136,7 @@ export function getDeletionReferences(
       .filter((category) => category.attributeIds.includes(id))
       .forEach((category) => refs.push(`カテゴリ「${category.name}」`));
     data.concepts.forEach((item) => {
-      if (item.attributeIds.includes(id))
-        refs.push(`コンセプト「${item.name}」`);
+      if (item.attributeIds.includes(id)) refs.push(`コンセプト「${item.name}」`);
       if (
         item.variantGroups.some((group) =>
           group.variants.some((variant) => variant.attributeIds.includes(id)),

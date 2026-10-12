@@ -130,16 +130,8 @@ export function validateData(
       );
     for (const group of concept?.variantGroups ?? []) {
       groups.set(group.id, { group, concept });
-      const count = group.variants?.length ?? 0;
-      if (
-        !Number.isInteger(group.minSelections) ||
-        group.minSelections < 0 ||
-        group.minSelections > count ||
-        (group.maxSelections !== undefined &&
-          (!Number.isInteger(group.maxSelections) ||
-            group.maxSelections < group.minSelections))
-      )
-        errors.push(`VariantGroup ${group.id} has invalid selection limits`);
+      if (!Array.isArray(group?.variants))
+        errors.push(`VariantGroup ${group.id}: variants must be an array`);
       for (const variant of group.variants ?? []) {
         variants.set(variant.id, { variant, group, concept });
         checkIds(
@@ -349,29 +341,19 @@ export function validateData(
           );
           continue;
         }
-        if (!Array.isArray(selection.variantIds)) {
-          errors.push(`Preset ${preset.id}: variantIds must be an array`);
+        if (typeof selection.variantId !== "string") {
+          errors.push(`Preset ${preset.id}: variantId must be a string`);
           continue;
         }
-        if (new Set(selection.variantIds).size !== selection.variantIds.length)
-          errors.push(`Preset ${preset.id} has duplicate variant`);
-        for (const id of selection.variantIds)
-          if (!group.variants.some((variant: any) => variant.id === id))
-            errors.push(`Preset ${preset.id} has invalid variant ${id}`);
         if (
-          selection.variantIds.length < group.minSelections ||
-          (group.maxSelections !== undefined &&
-            selection.variantIds.length > group.maxSelections)
+          !group.variants.some(
+            (variant: any) => variant.id === selection.variantId,
+          )
         )
           errors.push(
-            `Preset ${preset.id} violates group ${group.id} selection limits`,
+            `Preset ${preset.id} has invalid variant ${selection.variantId}`,
           );
       }
-      for (const group of concept.variantGroups ?? [])
-        if (group.minSelections > 0 && !used.has(group.id))
-          errors.push(
-            `Preset ${preset.id} missing required selection for ${group.id}`,
-          );
     }
   }
 

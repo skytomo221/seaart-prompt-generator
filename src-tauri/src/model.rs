@@ -48,9 +48,6 @@ pub struct Concept {
 pub struct VariantGroup {
     pub id: Id,
     pub name: String,
-    pub min_selections: usize,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_selections: Option<usize>,
     pub variants: Vec<Variant>,
 }
 
@@ -66,7 +63,7 @@ pub struct Variant {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct VariantSelection {
     pub group_id: Id,
-    pub variant_ids: Vec<Id>,
+    pub variant_id: Id,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
