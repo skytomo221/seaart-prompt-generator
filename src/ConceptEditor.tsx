@@ -152,6 +152,7 @@ export default function ConceptEditor({
         )}
       </section>
       <PromptFragmentEditor
+        readOnly
         label="フラグメント"
         value={concept.promptFragments}
         concepts={data.concepts}
@@ -160,6 +161,7 @@ export default function ConceptEditor({
         onChange={() => {}}
       />
       <PromptFragmentEditor
+        readOnly
         negative
         label="ネガティブフラグメント"
         value={concept.negativePromptFragments}

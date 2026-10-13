@@ -27,6 +27,7 @@ interface Props {
   attributes: Attribute[];
   label: string;
   negative?: boolean;
+  readOnly?: boolean;
 }
 
 export function formatFragmentSequence(
@@ -309,8 +310,8 @@ export default function PromptFragmentEditor({
   attributes,
   label,
   negative = false,
+  readOnly = false,
 }: Props) {
-  const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
   const initialCondition = createInitialCondition(
     concepts,
@@ -373,15 +374,8 @@ export default function PromptFragmentEditor({
     <section className="prompt-fragment-section">
       <div className="prompt-fragment-section-header">
         <h3>{label}</h3>
-        <Button
-          small
-          icon={editing ? "tick" : "edit"}
-          onClick={() => setEditing((current) => !current)}
-        >
-          {editing ? "編集を閉じる" : "編集"}
-        </Button>
       </div>
-      {!editing ? (
+      {readOnly ? (
         <>
           <div className="prompt-fragment-summary">{summary}</div>
           {value.definitions.length > 0 && (
