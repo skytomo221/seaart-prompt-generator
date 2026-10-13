@@ -1,7 +1,5 @@
 import {
-  Condition,
   Data,
-  PromptFragmentSet,
   PromptGeneratorsData,
 } from "../data";
 import { allPresets } from "./presets";
