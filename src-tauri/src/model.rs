@@ -165,6 +165,18 @@ pub struct VariantRequirement {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VariantFragmentCase {
+    pub variant_id: Id,
+    pub fragments: Vec<PromptFragment>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SelfVariantGroupCondition {
+    pub group_id: Id,
+    pub cases: Vec<VariantFragmentCase>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ConceptCondition {
     pub concept_id: Id,
     pub operator: ConceptConditionOperator,
@@ -183,6 +195,10 @@ pub enum Condition {
     Attribute { attribute: AttributeCondition },
     Preset { preset: PresetCondition },
     Concept { concept: ConceptCondition },
+    SelfVariantGroup {
+        #[serde(rename = "selfVariantGroup")]
+        self_variant_group: SelfVariantGroupCondition,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -226,6 +242,28 @@ mod tests {
         assert_eq!(
             out["definitions"][0]["if"]["category"]["existence"],
             "notExists"
+        );
+    }
+
+    #[test]
+    fn serde_supports_self_variant_group_condition() {
+        let v: PromptFragmentSet = serde_json::from_value(json!({
+            "root": [{"fragmentId":"f"}],
+            "definitions": [{
+                "id":"f",
+                "name":"制服",
+                "if":{"selfVariantGroup":{"groupId":"uniform","cases":[{"variantId":"summer","fragments":["summer uniform"]}]}},
+                "fragments":[]
+            }]
+        })).unwrap();
+        let out = serde_json::to_value(v).unwrap();
+        assert_eq!(
+            out["definitions"][0]["if"]["selfVariantGroup"]["groupId"],
+            "uniform"
+        );
+        assert_eq!(
+            out["definitions"][0]["if"]["selfVariantGroup"]["cases"][0]["variantId"],
+            "summer"
         );
     }
 }

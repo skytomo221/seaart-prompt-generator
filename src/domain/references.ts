@@ -28,6 +28,16 @@ function conditionHas(
     return field === "attributeId" && condition.attribute.attributeId === id;
   if ("preset" in condition)
     return field === "presetId" && condition.preset.presetId === id;
+  if ("selfVariantGroup" in condition) {
+    if (field === "groupId" && condition.selfVariantGroup.groupId === id)
+      return true;
+    if (
+      field === "variantId" &&
+      condition.selfVariantGroup.cases.some((item) => item.variantId === id)
+    )
+      return true;
+    return false;
+  }
   if (field === "conceptId" && condition.concept.conceptId === id) return true;
   if (
     field === "groupId" &&

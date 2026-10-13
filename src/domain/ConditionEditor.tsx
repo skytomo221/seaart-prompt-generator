@@ -12,13 +12,20 @@ import EntitySuggest, { EntityOption } from "./EntitySuggest";
 import { createInitialCondition } from "./conditionDefaults";
 
 type ConditionKind =
-  "all" | "any" | "category" | "concept" | "preset" | "attribute";
+  | "all"
+  | "any"
+  | "category"
+  | "concept"
+  | "preset"
+  | "attribute"
+  | "selfVariantGroup";
 interface Props {
   value: Condition;
   onChange(value: Condition): void;
   concepts: Concept[];
   categories: Category[];
   attributes: Attribute[];
+  selfConcept?: Concept;
   nested?: boolean;
 }
 
@@ -28,6 +35,7 @@ function kindOf(condition: Condition): ConditionKind {
   if ("category" in condition) return "category";
   if ("concept" in condition) return "concept";
   if ("preset" in condition) return "preset";
+  if ("selfVariantGroup" in condition) return "selfVariantGroup";
   return "attribute";
 }
 
@@ -61,6 +69,7 @@ export default function ConditionEditor({
   concepts,
   categories,
   attributes,
+  selfConcept,
   nested = false,
 }: Props) {
   const kind = kindOf(value);
@@ -72,10 +81,20 @@ export default function ConditionEditor({
     })),
   );
   const initial = createInitialCondition(concepts, categories, attributes);
+  const selfVariantGroups = nested ? [] : (selfConcept?.variantGroups ?? []);
 
   const makeForKind = (next: ConditionKind): Condition | undefined => {
-    if (next === "all") return { all: [value] };
-    if (next === "any") return { any: [value] };
+    if (next === "all" || next === "any") {
+      const child = "selfVariantGroup" in value ? initial : value;
+      if (!child) return undefined;
+      return next === "all" ? { all: [child] } : { any: [child] };
+    }
+    if (next === "selfVariantGroup") {
+      const group = selfVariantGroups[0];
+      return group
+        ? { selfVariantGroup: { groupId: group.id, cases: [] } }
+        : undefined;
+    }
     if (next === "category")
       return categories[0]
         ? {
@@ -145,6 +164,14 @@ export default function ConditionEditor({
       <option value="attribute" disabled={!attributes.length}>
         属性が
       </option>
+      {!nested && (selfConcept || kind === "selfVariantGroup") && (
+        <option
+          value="selfVariantGroup"
+          disabled={!selfVariantGroups.length && kind !== "selfVariantGroup"}
+        >
+          バリアントグループが
+        </option>
+      )}
     </HTMLSelect>
   );
 
@@ -193,6 +220,36 @@ export default function ConditionEditor({
           >
             条件を追加
           </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if ("selfVariantGroup" in value) {
+    return (
+      <div className="condition-editor condition-atomic">
+        <div className="condition-row">
+          <span>このインスタンスの</span>
+          {kindSelect}
+          <div className="condition-suggest">
+            <EntitySuggest
+              items={selfVariantGroups.map((group) => ({
+                id: group.id,
+                label: group.name,
+              }))}
+              selectedId={value.selfVariantGroup.groupId}
+              placeholder="バリアントグループを検索..."
+              onChange={(groupId) => {
+                if (!groupId) return;
+                onChange({
+                  selfVariantGroup: {
+                    groupId,
+                    cases: [],
+                  },
+                });
+              }}
+            />
+          </div>
         </div>
       </div>
     );

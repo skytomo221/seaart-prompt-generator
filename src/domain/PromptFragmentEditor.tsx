@@ -12,6 +12,7 @@ import {
   Condition,
   Concept,
   Id,
+  NamedPromptFragment,
   PromptFragment,
   PromptFragmentSet,
 } from "../data";
@@ -74,6 +75,14 @@ export function parseFragmentSequence(
   return { fragments };
 }
 
+function definitionFragments(definition: NamedPromptFragment): PromptFragment[] {
+  if ("selfVariantGroup" in definition.if)
+    return definition.if.selfVariantGroup.cases.flatMap(
+      (item) => item.fragments,
+    );
+  return definition.fragments;
+}
+
 export function findFragmentCycle(set: PromptFragmentSet): Id[] | undefined {
   const definitions = new Map(
     set.definitions.map((definition) => [definition.id, definition]),
@@ -90,7 +99,7 @@ export function findFragmentCycle(set: PromptFragmentSet): Id[] | undefined {
     visiting.add(id);
     path.push(id);
     const definition = definitions.get(id);
-    for (const fragment of definition?.fragments ?? []) {
+    for (const fragment of definition ? definitionFragments(definition) : []) {
       if (typeof fragment === "string") continue;
       const cycle = visit(fragment.fragmentId);
       if (cycle) return cycle;
@@ -115,7 +124,7 @@ function referencesDefinition(set: PromptFragmentSet, id: Id): boolean {
   return (
     has(set.root) ||
     set.definitions.some(
-      (definition) => definition.id !== id && has(definition.fragments),
+      (definition) => definition.id !== id && has(definitionFragments(definition)),
     )
   );
 }
@@ -181,11 +190,13 @@ function ReadOnlyCondition({
   concepts,
   categories,
   attributes,
+  selfConcept,
 }: {
   value: Condition;
   concepts: Concept[];
   categories: Category[];
   attributes: Attribute[];
+  selfConcept?: Concept;
 }) {
   if ("all" in value || "any" in value) {
     const items = "all" in value ? value.all : value.any;
@@ -199,12 +210,24 @@ function ReadOnlyCondition({
             <li key={index}>
               <ReadOnlyCondition
                 value={item}
-                {...{ concepts, categories, attributes }}
+                {...{ concepts, categories, attributes, selfConcept }}
               />
             </li>
           ))}
         </ul>
       </div>
+    );
+  }
+
+  if ("selfVariantGroup" in value) {
+    const group = selfConcept?.variantGroups.find(
+      (item) => item.id === value.selfVariantGroup.groupId,
+    );
+    return (
+      <span>
+        このインスタンスのバリアントグループ「
+        {group?.name ?? "不明なバリアントグループ"}」
+      </span>
     );
   }
 
@@ -318,6 +341,10 @@ export default function PromptFragmentEditor({
     categories,
     attributes,
   );
+  const ownerConcept = concepts.find(
+    (concept) =>
+      concept.promptFragments === value || concept.negativePromptFragments === value,
+  );
   const namedLabel = negative
     ? "名前付きネガティブフラグメント"
     : "名前付きフラグメント";
@@ -332,13 +359,7 @@ export default function PromptFragmentEditor({
         definition.id === id ? { ...definition, ...patch } : definition,
       ),
     });
-  const updateDefinitionFragments = (id: Id, fragments: PromptFragment[]) => {
-    const next: PromptFragmentSet = {
-      ...value,
-      definitions: value.definitions.map((definition) =>
-        definition.id === id ? { ...definition, fragments } : definition,
-      ),
-    };
+  const applyWithCycleCheck = (next: PromptFragmentSet) => {
     const cycle = findFragmentCycle(next);
     if (cycle) {
       const names = cycle.map(
@@ -354,8 +375,50 @@ export default function PromptFragmentEditor({
     setError("");
     onChange(next);
   };
+  const updateDefinitionFragments = (id: Id, fragments: PromptFragment[]) => {
+    const next: PromptFragmentSet = {
+      ...value,
+      definitions: value.definitions.map((definition) =>
+        definition.id === id ? { ...definition, fragments } : definition,
+      ),
+    };
+    applyWithCycleCheck(next);
+  };
+  const updateVariantCaseFragments = (
+    id: Id,
+    variantId: Id,
+    fragments: PromptFragment[],
+  ) => {
+    const next: PromptFragmentSet = {
+      ...value,
+      definitions: value.definitions.map((definition) => {
+        if (definition.id !== id || !("selfVariantGroup" in definition.if))
+          return definition;
+        const condition = definition.if.selfVariantGroup;
+        const cases = condition.cases.filter(
+          (item) => item.variantId !== variantId,
+        );
+        if (fragments.length) cases.push({ variantId, fragments });
+        return {
+          ...definition,
+          if: { selfVariantGroup: { ...condition, cases } },
+        };
+      }),
+    };
+    applyWithCycleCheck(next);
+  };
   const addDefinition = () => {
-    if (!initialCondition) return;
+    const condition =
+      initialCondition ??
+      (ownerConcept?.variantGroups[0]
+        ? {
+            selfVariantGroup: {
+              groupId: ownerConcept.variantGroups[0].id,
+              cases: [],
+            },
+          }
+        : undefined);
+    if (!condition) return;
     onChange({
       ...value,
       definitions: [
@@ -363,11 +426,65 @@ export default function PromptFragmentEditor({
         {
           id: crypto.randomUUID(),
           name: nextName(value, negative),
-          if: initialCondition,
+          if: condition,
           fragments: [],
         },
       ],
     });
+  };
+
+  const renderVariantCases = (
+    definition: NamedPromptFragment,
+    editable: boolean,
+  ) => {
+    if (!("selfVariantGroup" in definition.if)) return null;
+    const condition = definition.if.selfVariantGroup;
+    const group = ownerConcept?.variantGroups.find(
+      (item) => item.id === condition.groupId,
+    );
+    if (!group)
+      return (
+        <small className="condition-validation">
+          バリアントグループが見つかりません。
+        </small>
+      );
+    return (
+      <div className="named-fragment-list">
+        {group.variants.map((variant) => {
+          const fragments =
+            condition.cases.find((item) => item.variantId === variant.id)
+              ?.fragments ?? [];
+          return (
+            <div className="named-fragment-field" key={variant.id}>
+              <b>{variant.name}のとき：</b>
+              {editable ? (
+                <SequenceEditor
+                  sequence={fragments}
+                  set={value}
+                  ariaLabel={`${variant.name}のときの挿入フラグメント`}
+                  onChange={(nextFragments) =>
+                    updateVariantCaseFragments(
+                      definition.id,
+                      variant.id,
+                      nextFragments,
+                    )
+                  }
+                />
+              ) : (
+                <div className="prompt-fragment-summary">
+                  {formatFragmentSequence(fragments, value) || "（空）"}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {!group.variants.length && (
+          <small className="condition-validation">
+            このバリアントグループにはバリアントがありません。
+          </small>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -394,16 +511,25 @@ export default function PromptFragmentEditor({
                     <b>条件：</b>
                     <ReadOnlyCondition
                       value={definition.if}
-                      {...{ concepts, categories, attributes }}
+                      {...{
+                        concepts,
+                        categories,
+                        attributes,
+                        selfConcept: ownerConcept,
+                      }}
                     />
                   </div>
-                  <div className="named-fragment-field">
-                    <b>挿入フラグメント：</b>
-                    <div className="prompt-fragment-summary">
-                      {formatFragmentSequence(definition.fragments, value) ||
-                        "（空）"}
+                  {"selfVariantGroup" in definition.if ? (
+                    renderVariantCases(definition, false)
+                  ) : (
+                    <div className="named-fragment-field">
+                      <b>挿入フラグメント：</b>
+                      <div className="prompt-fragment-summary">
+                        {formatFragmentSequence(definition.fragments, value) ||
+                          "（空）"}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </Card>
               ))}
             </div>
@@ -480,36 +606,48 @@ export default function PromptFragmentEditor({
                     <ConditionEditor
                       value={definition.if}
                       onChange={(condition) =>
-                        patchDefinition(definition.id, { if: condition })
+                        patchDefinition(definition.id, {
+                          if: condition,
+                          ...("selfVariantGroup" in condition
+                            ? { fragments: [] }
+                            : {}),
+                        })
                       }
+                      selfConcept={ownerConcept}
                       {...{ concepts, categories, attributes }}
                     />
                   </div>
-                  <div className="named-fragment-field">
-                    <b>挿入フラグメント：</b>
-                    <SequenceEditor
-                      sequence={definition.fragments}
-                      set={value}
-                      ariaLabel={`${definition.name}の挿入フラグメント`}
-                      onChange={(fragments) =>
-                        updateDefinitionFragments(definition.id, fragments)
-                      }
-                    />
-                  </div>
+                  {"selfVariantGroup" in definition.if ? (
+                    renderVariantCases(definition, true)
+                  ) : (
+                    <div className="named-fragment-field">
+                      <b>挿入フラグメント：</b>
+                      <SequenceEditor
+                        sequence={definition.fragments}
+                        set={value}
+                        ariaLabel={`${definition.name}の挿入フラグメント`}
+                        onChange={(fragments) =>
+                          updateDefinitionFragments(definition.id, fragments)
+                        }
+                      />
+                    </div>
+                  )}
                 </Card>
               );
             })}
             <Button
               small
               icon="add"
-              disabled={!initialCondition}
+              disabled={
+                !initialCondition && !ownerConcept?.variantGroups.length
+              }
               onClick={addDefinition}
             >
               {namedLabel}を追加
             </Button>
-            {!initialCondition && (
+            {!initialCondition && !ownerConcept?.variantGroups.length && (
               <small className="condition-validation">
-                条件に使用できるカテゴリ・コンセプト・プリセット・属性がありません。
+                条件に使用できるカテゴリ・コンセプト・プリセット・属性・バリアントグループがありません。
               </small>
             )}
           </div>

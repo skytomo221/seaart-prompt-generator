@@ -96,6 +96,10 @@ fn normalize_condition(condition: &mut Value) -> Result<bool, String> {
         return Ok(true);
     }
 
+    if condition.get("selfVariantGroup").is_some() {
+        return Ok(false);
+    }
+
     Err("Unknown Condition shape while migrating instance existence".into())
 }
 
@@ -120,5 +124,13 @@ mod tests {
             data["concepts"][0]["promptFragments"]["definitions"][0]["if"]["category"]["operator"],
             "isNot"
         );
+    }
+
+    #[test]
+    fn keeps_self_variant_group_condition_unchanged() {
+        let original = json!({"concepts":[{"promptFragments":{"definitions":[{"if":{"selfVariantGroup":{"groupId":"uniform","cases":[{"variantId":"summer","fragments":["summer uniform"]},{"variantId":"winter","fragments":["winter uniform"]}]}}}]},"negativePromptFragments":{"definitions":[]}}]});
+        let mut data = original.clone();
+        assert!(!migrate_data(&mut data).unwrap());
+        assert_eq!(data, original);
     }
 }

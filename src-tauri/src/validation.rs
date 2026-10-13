@@ -163,6 +163,7 @@ pub fn validate_pair(data_value: &Value, generators_value: &Value) -> Result<(),
         validate_fragment_set(
             &concept.prompt_fragments,
             "promptFragments",
+            concept,
             &category_ids,
             &attr_ids,
             &concept_ids,
@@ -174,6 +175,7 @@ pub fn validate_pair(data_value: &Value, generators_value: &Value) -> Result<(),
         validate_fragment_set(
             &concept.negative_prompt_fragments,
             "negativePromptFragments",
+            concept,
             &category_ids,
             &attr_ids,
             &concept_ids,
@@ -270,6 +272,7 @@ fn validate_selections(
 fn validate_fragment_set(
     set: &PromptFragmentSet,
     label: &str,
+    owner_concept: &Concept,
     category_ids: &HashSet<String>,
     attr_ids: &HashSet<String>,
     concept_ids: &HashSet<String>,
@@ -294,17 +297,64 @@ fn validate_fragment_set(
                 definition.name
             ));
         }
-        validate_condition(
-            &definition.condition,
-            category_ids,
-            attr_ids,
-            concept_ids,
-            preset_ids,
-            group_owner,
-            variant_group,
-            errors,
-        );
-        validate_sequence(&definition.fragments, &definition_ids, label, errors);
+        match &definition.condition {
+            Condition::SelfVariantGroup { self_variant_group } => {
+                let Some(group) = owner_concept
+                    .variant_groups
+                    .iter()
+                    .find(|group| group.id == self_variant_group.group_id)
+                else {
+                    errors.push(format!(
+                        "{label}: selfVariantGroup references missing or foreign VariantGroup {}",
+                        self_variant_group.group_id
+                    ));
+                    continue;
+                };
+                if !definition.fragments.is_empty() {
+                    errors.push(format!(
+                        "{label}: selfVariantGroup definition fragments must be empty"
+                    ));
+                }
+                let mut seen = HashSet::<String>::new();
+                for variant_case in &self_variant_group.cases {
+                    if !seen.insert(variant_case.variant_id.clone()) {
+                        errors.push(format!(
+                            "{label}: duplicate selfVariantGroup case {}",
+                            variant_case.variant_id
+                        ));
+                    }
+                    if !group
+                        .variants
+                        .iter()
+                        .any(|variant| variant.id == variant_case.variant_id)
+                    {
+                        errors.push(format!(
+                            "{label}: selfVariantGroup case references missing or foreign Variant {}",
+                            variant_case.variant_id
+                        ));
+                    }
+                    validate_sequence(
+                        &variant_case.fragments,
+                        &definition_ids,
+                        label,
+                        errors,
+                    );
+                }
+            }
+            condition => {
+                validate_condition(
+                    condition,
+                    category_ids,
+                    attr_ids,
+                    concept_ids,
+                    preset_ids,
+                    group_owner,
+                    variant_group,
+                    errors,
+                );
+                validate_sequence(&definition.fragments, &definition_ids, label, errors);
+            }
+        }
     }
     validate_sequence(&set.root, &definition_ids, label, errors);
     let by_id: HashMap<String, &crate::model::NamedPromptFragment> = set
@@ -325,15 +375,33 @@ fn validate_fragment_set(
             return false;
         }
         visiting.insert(id.to_string());
-        let found = by_id
-            .get(id)
-            .into_iter()
-            .flat_map(|definition| definition.fragments.iter())
-            .filter_map(|fragment| match fragment {
-                PromptFragment::Reference(reference) => Some(reference.fragment_id.as_str()),
-                PromptFragment::Tag(_) => None,
-            })
-            .any(|next| visit(next, by_id, visiting, done));
+        let found = if let Some(definition) = by_id.get(id) {
+            match &definition.condition {
+                Condition::SelfVariantGroup { self_variant_group } => self_variant_group
+                    .cases
+                    .iter()
+                    .flat_map(|variant_case| variant_case.fragments.iter())
+                    .filter_map(|fragment| match fragment {
+                        PromptFragment::Reference(reference) => {
+                            Some(reference.fragment_id.as_str())
+                        }
+                        PromptFragment::Tag(_) => None,
+                    })
+                    .any(|next| visit(next, by_id, visiting, done)),
+                _ => definition
+                    .fragments
+                    .iter()
+                    .filter_map(|fragment| match fragment {
+                        PromptFragment::Reference(reference) => {
+                            Some(reference.fragment_id.as_str())
+                        }
+                        PromptFragment::Tag(_) => None,
+                    })
+                    .any(|next| visit(next, by_id, visiting, done)),
+            }
+        } else {
+            false
+        };
         visiting.remove(id);
         done.insert(id.to_string());
         found
@@ -488,6 +556,9 @@ fn validate_condition(
                 }
             }
         }
+        Condition::SelfVariantGroup { .. } => errors.push(
+            "selfVariantGroup is only valid as the top-level named fragment condition".into(),
+        ),
     }
 }
 
@@ -518,6 +589,25 @@ mod tests {
         data["concepts"][0]["variantGroups"] = json!([{"id":"uniform","name":"制服","variants":[{"id":"summer","name":"夏服","attributeIds":[]},{"id":"winter","name":"冬服","attributeIds":[]}]}]);
         data["concepts"][0]["presets"][0]["variantSelections"] = json!([{"groupId":"uniform","variantId":"summer"}]);
         generators["promptGenerators"] = json!([{"id":"g","instances":[{"id":"i","conceptId":"con","presetId":"pre","variantSelections":[{"groupId":"uniform","variantId":"winter"}]}]}]);
+        assert!(validate_pair(&data, &generators).is_ok());
+    }
+
+    #[test]
+    fn accepts_self_variant_group_fragment_condition() {
+        let (mut data, generators) = valid();
+        data["concepts"][0]["variantGroups"] = json!([{"id":"uniform","name":"制服","variants":[{"id":"summer","name":"夏服","attributeIds":[]},{"id":"winter","name":"冬服","attributeIds":[]}]}]);
+        data["concepts"][0]["promptFragments"] = json!({
+            "root":[{"fragmentId":"uniform-fragment"}],
+            "definitions":[{
+                "id":"uniform-fragment",
+                "name":"制服",
+                "if":{"selfVariantGroup":{"groupId":"uniform","cases":[
+                    {"variantId":"summer","fragments":["summer uniform"]},
+                    {"variantId":"winter","fragments":["winter uniform"]}
+                ]}},
+                "fragments":[]
+            }]
+        });
         assert!(validate_pair(&data, &generators).is_ok());
     }
 }

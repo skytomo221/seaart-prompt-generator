@@ -195,6 +195,12 @@ export function validateData(
       condition[key].forEach((child: any) => checkCondition(child, owner));
       return;
     }
+    if ("selfVariantGroup" in condition) {
+      errors.push(
+        `${owner}: selfVariantGroup is only valid as the top-level named fragment condition`,
+      );
+      return;
+    }
     if ("category" in condition) {
       const item = condition.category;
       if (!item || !catIds.has(item.categoryId))
@@ -263,7 +269,7 @@ export function validateData(
     errors.push(`${owner}: unknown Condition operator`);
   };
 
-  const checkFragmentSet = (set: any, owner: string): void => {
+  const checkFragmentSet = (set: any, owner: string, concept: any): void => {
     if (
       !set ||
       typeof set !== "object" ||
@@ -303,6 +309,7 @@ export function validateData(
     };
     checkSequence(set.root, `${owner} root`);
     for (const definition of set.definitions) {
+      const definitionOwner = `${owner} #[${definition.name ?? definition.id}]`;
       if (typeof definition.name !== "string" || !definition.name.trim())
         errors.push(`${owner}: named fragment must have a name`);
       else if (names.has(definition.name))
@@ -310,14 +317,50 @@ export function validateData(
           `${owner}: duplicate named fragment name ${definition.name}`,
         );
       else names.add(definition.name);
-      checkCondition(
-        definition.if,
-        `${owner} #[${definition.name ?? definition.id}]`,
-      );
-      checkSequence(
-        definition.fragments,
-        `${owner} #[${definition.name ?? definition.id}]`,
-      );
+
+      if (definition?.if && "selfVariantGroup" in definition.if) {
+        const item = definition.if.selfVariantGroup;
+        const group = (concept.variantGroups ?? []).find(
+          (candidate: any) => candidate.id === item?.groupId,
+        );
+        if (!group)
+          errors.push(
+            `${definitionOwner}: missing or foreign self variant group ${String(item?.groupId)}`,
+          );
+        if (!Array.isArray(item?.cases)) {
+          errors.push(`${definitionOwner}: cases must be an array`);
+        } else {
+          const usedVariants = new Set<string>();
+          for (const variantCase of item.cases) {
+            if (usedVariants.has(variantCase?.variantId))
+              errors.push(
+                `${definitionOwner}: duplicate variant case ${String(variantCase?.variantId)}`,
+              );
+            usedVariants.add(variantCase?.variantId);
+            if (
+              !group?.variants.some(
+                (variant: any) => variant.id === variantCase?.variantId,
+              )
+            )
+              errors.push(
+                `${definitionOwner}: missing or foreign variant case ${String(variantCase?.variantId)}`,
+              );
+            checkSequence(
+              variantCase?.fragments,
+              `${definitionOwner} variant ${String(variantCase?.variantId)}`,
+            );
+          }
+        }
+        if (!Array.isArray(definition.fragments))
+          errors.push(`${definitionOwner}: fragments must be an array`);
+        else if (definition.fragments.length)
+          errors.push(
+            `${definitionOwner}: fragments must be empty for selfVariantGroup`,
+          );
+      } else {
+        checkCondition(definition.if, definitionOwner);
+        checkSequence(definition.fragments, definitionOwner);
+      }
     }
     const byId = new Map(
       set.definitions.map((definition: any) => [definition.id, definition]),
@@ -329,7 +372,13 @@ export function validateData(
       if (cycleDone.has(id)) return false;
       cycleVisiting.add(id);
       const definition: any = byId.get(id);
-      for (const fragment of definition?.fragments ?? [])
+      const fragments =
+        definition?.if && "selfVariantGroup" in definition.if
+          ? (definition.if.selfVariantGroup.cases ?? []).flatMap(
+              (item: any) => item.fragments ?? [],
+            )
+          : (definition?.fragments ?? []);
+      for (const fragment of fragments)
         if (typeof fragment !== "string" && visit(fragment.fragmentId))
           return true;
       cycleVisiting.delete(id);
@@ -347,10 +396,12 @@ export function validateData(
     checkFragmentSet(
       concept.promptFragments,
       `Concept ${concept.id} promptFragments`,
+      concept,
     );
     checkFragmentSet(
       concept.negativePromptFragments,
       `Concept ${concept.id} negativePromptFragments`,
+      concept,
     );
     for (const preset of concept.presets ?? [])
       checkSelections(`Preset ${preset.id}`, concept, preset.variantSelections);
@@ -371,21 +422,47 @@ export function validateData(
       for (const instance of generator.instances) {
         addId(instance, "concept instance");
         if (instance.conceptId === undefined && instance.presetId === undefined) {
-          checkSelections(`Instance ${instance.id}`, { variantGroups: [] }, instance.variantSelections);
+          checkSelections(
+            `Instance ${instance.id}`,
+            { variantGroups: [] },
+            instance.variantSelections,
+          );
           continue;
         }
-        if (typeof instance.conceptId !== "string" || !conceptIds.has(instance.conceptId)) {
-          errors.push(`Instance ${instance.id} references missing concept ${String(instance.conceptId)}`);
+        if (
+          typeof instance.conceptId !== "string" ||
+          !conceptIds.has(instance.conceptId)
+        ) {
+          errors.push(
+            `Instance ${instance.id} references missing concept ${String(instance.conceptId)}`,
+          );
           continue;
         }
-        if (typeof instance.presetId !== "string" || !presetIds.has(instance.presetId)) {
-          errors.push(`Instance ${instance.id} references missing preset ${String(instance.presetId)}`);
+        if (
+          typeof instance.presetId !== "string" ||
+          !presetIds.has(instance.presetId)
+        ) {
+          errors.push(
+            `Instance ${instance.id} references missing preset ${String(instance.presetId)}`,
+          );
           continue;
         }
-        const concept = concepts.find((item) => item.id === instance.conceptId);
-        if (!concept?.presets.some((preset: any) => preset.id === instance.presetId))
-          errors.push(`Instance ${instance.id} preset does not belong to its concept`);
-        checkSelections(`Instance ${instance.id}`, concept, instance.variantSelections);
+        const concept = concepts.find(
+          (item) => item.id === instance.conceptId,
+        );
+        if (
+          !concept?.presets.some(
+            (preset: any) => preset.id === instance.presetId,
+          )
+        )
+          errors.push(
+            `Instance ${instance.id} preset does not belong to its concept`,
+          );
+        checkSelections(
+          `Instance ${instance.id}`,
+          concept,
+          instance.variantSelections,
+        );
       }
     }
   }

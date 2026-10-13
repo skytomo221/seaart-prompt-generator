@@ -127,6 +127,7 @@ export function evaluateCondition(
     });
     return applyExistence(matched, condition.preset.existence);
   }
+  if ("selfVariantGroup" in condition) return false;
 
   const requirements = condition.concept.variants ?? [];
   const matched = environment.some((item) => {
@@ -145,6 +146,7 @@ export function evaluateCondition(
 export function evaluateFragments(
   fragments: PromptFragment[],
   set: PromptFragmentSet,
+  self: RuntimeInstance,
   environment: RuntimeInstance[],
   data: Data,
   resolving: ReadonlySet<Id> = new Set(),
@@ -158,18 +160,30 @@ export function evaluateFragments(
     const definition = set.definitions.find(
       (candidate) => candidate.id === fragment.fragmentId,
     );
-    if (
-      !definition ||
-      resolving.has(definition.id) ||
-      !evaluateCondition(definition.if, environment, data)
-    )
-      continue;
+    if (!definition || resolving.has(definition.id)) continue;
+
+    let selectedFragments: PromptFragment[] | undefined;
+    if ("selfVariantGroup" in definition.if) {
+      const condition = definition.if.selfVariantGroup;
+      const selectedVariantId = self.instance.variantSelections.find(
+        (selection) => selection.groupId === condition.groupId,
+      )?.variantId;
+      selectedFragments = condition.cases.find(
+        (item) => item.variantId === selectedVariantId,
+      )?.fragments;
+      if (!selectedFragments) continue;
+    } else {
+      if (!evaluateCondition(definition.if, environment, data)) continue;
+      selectedFragments = definition.fragments;
+    }
+
     const nextResolving = new Set(resolving);
     nextResolving.add(definition.id);
     output.push(
       ...evaluateFragments(
-        definition.fragments,
+        selectedFragments,
         set,
+        self,
         environment,
         data,
         nextResolving,
@@ -188,7 +202,7 @@ export function evaluateConceptInstance(
   const set = negative
     ? self.concept.negativePromptFragments
     : self.concept.promptFragments;
-  return evaluateFragments(set.root, set, environment, data);
+  return evaluateFragments(set.root, set, self, environment, data);
 }
 
 export function evaluatePrompt(generator: PromptGenerator, data: Data) {

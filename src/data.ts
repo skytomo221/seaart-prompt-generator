@@ -54,6 +54,14 @@ export interface VariantRequirement {
   groupId: Id;
   variantId: Id;
 }
+export interface VariantFragmentCase {
+  variantId: Id;
+  fragments: PromptFragment[];
+}
+export interface SelfVariantGroupCondition {
+  groupId: Id;
+  cases: VariantFragmentCase[];
+}
 export type ConceptConditionOperator =
   | "is"
   | "isNot"
@@ -86,7 +94,8 @@ export type Condition =
   | { category: CategoryCondition }
   | { attribute: AttributeCondition }
   | { preset: PresetCondition }
-  | { concept: ConceptCondition };
+  | { concept: ConceptCondition }
+  | { selfVariantGroup: SelfVariantGroupCondition };
 
 export interface Concept {
   id: Id;
