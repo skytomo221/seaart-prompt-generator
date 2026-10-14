@@ -45,6 +45,7 @@ async fn save_data(payload: SavePayload) -> Result<(), String> {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![load_configs, save_data])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

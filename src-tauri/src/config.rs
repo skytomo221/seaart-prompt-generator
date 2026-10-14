@@ -207,7 +207,7 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
     #[test]
-    fn fresh_prompt_generator_configuration_has_stable_uuid_slots() {
+    fn fresh_prompt_generator_configuration_has_stable_instance_ids() {
         let root = temp();
         write(
             &root.join("data.json"),
@@ -215,7 +215,7 @@ mod tests {
         );
         let first = load_configs(&root).unwrap();
         assert_eq!(
-            first.prompt_generators["promptGenerators"][0]["presetSlots"]
+            first.prompt_generators["promptGenerators"][0]["instances"]
                 .as_array()
                 .unwrap()
                 .len(),
