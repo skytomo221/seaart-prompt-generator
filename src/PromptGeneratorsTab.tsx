@@ -1,30 +1,102 @@
+import { Button } from "@blueprintjs/core";
+import {
+  closestCenter,
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  horizontalListSortingStrategy,
+  SortableContext,
+} from "@dnd-kit/sortable";
+import { AnimatePresence, motion } from "framer-motion";
+import { v4 as uuid } from "uuid";
+import { Data, PromptGenerator } from "./data";
 import PromptGeneratorForm from "./PromptGeneratorForm";
-import Box from "@mui/material/Box";
-import Stack from '@mui/material/Stack';
-import { motion, AnimatePresence } from "framer-motion";
-import { usePromptGeneratorsStore } from "./contexts/promptGeneratorsContext";
+import { ResultCopyStatusProvider } from "./ResultText";
 
-export default function PromptGeneratorsTab() {
-  const promptGenerators = usePromptGeneratorsStore();
+export default function PromptGeneratorsTab({
+  data,
+  generators,
+  onChange,
+}: {
+  data: Data;
+  generators: PromptGenerator[];
+  onChange: (generators: PromptGenerator[]) => void;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+  );
+  const add = () => onChange([...generators, { id: uuid(), instances: [] }]);
+  const clone = (source: number, at: number) => {
+    const original = generators[source];
+    if (!original) return;
+    const copy = {
+      id: uuid(),
+      instances: original.instances.map((instance) => ({
+        ...instance,
+        id: uuid(),
+        variantSelections: instance.variantSelections.map((selection) => ({
+          ...selection,
+        })),
+      })),
+    };
+    onChange([...generators.slice(0, at), copy, ...generators.slice(at)]);
+  };
+  const change = (generator: PromptGenerator) =>
+    onChange(
+      generators.map((item) =>
+        item.id === generator.id ? generator : item,
+      ),
+    );
+  const remove = (id: string) =>
+    onChange(generators.filter((item) => item.id !== id));
+  const reorder = (event: DragEndEvent) => {
+    if (!event.over || event.active.id === event.over.id) return;
+    const from = generators.findIndex(
+      (generator) => generator.id === String(event.active.id),
+    );
+    const to = generators.findIndex(
+      (generator) => generator.id === String(event.over!.id),
+    );
+    if (from >= 0 && to >= 0) onChange(arrayMove(generators, from, to));
+  };
 
   return (
-    <Box sx={{ my: 2, display: "flex" }}>
-      <AnimatePresence initial={false}>
-        {promptGenerators.map((pg, index) => (
-          <motion.div
-            key={pg.id}
-            layout="position"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.2 }}
+    <ResultCopyStatusProvider>
+      <div className="prompt-generators-tab">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={reorder}
+        >
+          <SortableContext
+            items={generators.map((generator) => generator.id)}
+            strategy={horizontalListSortingStrategy}
           >
-            <Stack direction="row">
-              <PromptGeneratorForm index={index} />
-            </Stack>
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </Box>
+            <AnimatePresence initial={false}>
+              {generators.map((generator, index) => (
+                <motion.div key={generator.id}>
+                  <PromptGeneratorForm
+                    generator={generator}
+                    index={index}
+                    data={data}
+                    onChange={change}
+                    onClone={clone}
+                    onDelete={() => remove(generator.id)}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </SortableContext>
+          <Button icon="add" variant="outlined" onClick={add}>
+            生成フォーム追加
+          </Button>
+        </DndContext>
+      </div>
+    </ResultCopyStatusProvider>
   );
 }

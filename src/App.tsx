@@ -1,24 +1,13 @@
-import { KeywordsProvider } from "./contexts/keywordsContext";
-import { KeywordTypesProvider } from "./contexts/keywordTypesContext";
-import { DefaultCharactersProvider } from "./contexts/defaultsContext";
-import { PromptGeneratorsProvider } from "./contexts/promptGeneratorsContext";
-import { CharacterTypeNameProvider } from "./contexts/characterTypeNameContext";
+import { V2Provider } from "./contexts/v2Context";
+import UpdateChecker from "./UpdateChecker";
 import Workspace from "./Workspace";
-
-function App() {
+export default function App() {
   return (
-    <KeywordsProvider>
-      <KeywordTypesProvider>
-        <DefaultCharactersProvider>
-          <PromptGeneratorsProvider>
-            <CharacterTypeNameProvider>
-              <Workspace />
-            </CharacterTypeNameProvider>
-          </PromptGeneratorsProvider>
-        </DefaultCharactersProvider>
-      </KeywordTypesProvider>
-    </KeywordsProvider>
+    <>
+      <UpdateChecker />
+      <V2Provider>
+        <Workspace />
+      </V2Provider>
+    </>
   );
 }
-
-export default App;

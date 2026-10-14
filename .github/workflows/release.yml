@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Verify tag and application versions
+        shell: pwsh
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:TAG_NAME -match '^v(.+)$') {
+            $tagVersion = $Matches[1]
+          } else {
+            throw "Release tag must begin with v: $env:TAG_NAME"
+          }
+          $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $cargoText = Get-Content src-tauri/Cargo.toml -Raw
+          if ($cargoText -match '(?m)^version\s*=\s*"([^"]+)"') {
+            $cargoVersion = $Matches[1]
+          } else {
+            throw 'Could not read src-tauri/Cargo.toml package version'
+          }
+          $tauriVersion = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          if ($tagVersion -ne $packageVersion -or $tagVersion -ne $cargoVersion -or $tagVersion -ne $tauriVersion) {
+            throw "Tag v$tagVersion must match package.json ($packageVersion), Cargo.toml ($cargoVersion), and tauri.conf.json ($tauriVersion)"
+          }
+
+      - name: Run frontend tests
+        run: npm test
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Test Rust code
+        run: cargo test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
+
+      - name: Check Rust code
+        run: cargo check --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
+
+      - name: Build and publish Windows x64 release
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Seaart Prompt Generator ${{ github.ref_name }}
+          releaseBody: Windows x64 NSIS installer and updater artifacts.
+          releaseDraft: false
+          prerelease: false
+          args: --target x86_64-pc-windows-msvc
+          updaterJsonPreferNsis: true
+          uploadUpdaterJson: true
+          uploadUpdaterSignatures: true

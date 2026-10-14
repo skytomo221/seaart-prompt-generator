@@ -1,0 +1,103 @@
+import type { MutableRefObject } from "react";
+import { Category, Data } from "./data";
+import { v4 as uuid } from "uuid";
+import CategoryList from "./CategoryList";
+import CategoryEditor from "./CategoryEditor";
+import { getDeletionReferences } from "./domain/references";
+export default function CategoriesTab({
+  data,
+  onChange,
+  selectedId,
+  onSelect,
+  onError,
+  scrollTopRef,
+}: {
+  data: Data;
+  onChange: (d: Data) => void;
+  selectedId: string;
+  onSelect: (id: string) => void;
+  onError: (message: string) => void;
+  scrollTopRef: MutableRefObject<number>;
+}) {
+  const add = (at: number) => {
+    const c: Category = {
+      id: uuid(),
+      name: "新しいカテゴリ",
+      attributeIds: [],
+      backgroundColor: "#ffffff",
+      color: "#000000",
+    };
+    onChange({
+      ...data,
+      categories: [
+        ...data.categories.slice(0, at),
+        c,
+        ...data.categories.slice(at),
+      ],
+    });
+    onSelect(c.id);
+  };
+  const selected = data.categories.find((c) => c.id === selectedId);
+  const itemStyles = Object.fromEntries(
+    data.categories.map((category) => [
+      category.id,
+      { color: category.color, backgroundColor: category.backgroundColor },
+    ]),
+  );
+  return (
+    <div className="tab-content editor-tab-content">
+      <CategoryList
+        items={data.categories}
+        selectedId={selectedId}
+        onSelect={onSelect}
+        onAdd={add}
+        scrollTopRef={scrollTopRef}
+        itemStyles={itemStyles}
+        onReorder={(items) =>
+          onChange({
+            ...data,
+            categories: items.map((i) =>
+              data.categories.find((c) => c.id === i.id)!,
+            ),
+          })
+        }
+      />
+      <div className="editor-detail-pane">
+        {selected ? (
+          <CategoryEditor
+            category={selected}
+            data={data}
+            onChange={(c) =>
+              onChange({
+                ...data,
+                categories: data.categories.map((x) => (x.id === c.id ? c : x)),
+              })
+            }
+            onDelete={() => {
+              const refs = getDeletionReferences(
+                "category",
+                selected.id,
+                data,
+                { schemaVersion: 2, promptGenerators: [] },
+              );
+              if (refs.length)
+                onError(`削除できません。参照元:\n${refs.join("\n")}`);
+              else {
+                onError("");
+                onChange({
+                  ...data,
+                  categories: data.categories.filter(
+                    (x) => x.id !== selected.id,
+                  ),
+                });
+                onSelect("");
+              }
+            }}
+          />
+        ) : (
+          <div className="editor-empty-state">カテゴリを選択してください</div>
+        )}
+      </div>
+    </div>
+  );
+}

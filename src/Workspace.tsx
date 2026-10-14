@@ -1,134 +1,144 @@
-import * as React from 'react';
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Data } from "./data";
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import Box from '@mui/material/Box';
-import PromptGeneratorsTab from './PromptGeneratorsTab';
-import KeywordsTab from './KeywordsTab';
-import KeywordTypesTab from './KeywordTypesTab';
-import { useKeywordsDispatch, useKeywordsStore } from './contexts/keywordsContext';
-import { useKeywordTypesDispatch, useKeywordTypesStore } from './contexts/keywordTypesContext';
-import { useDefaultCharactersStore, useDefaultCharactersDispatch } from './contexts/defaultsContext';
-import { usePromptGeneratorsStore, usePromptGeneratorsDispatch } from './contexts/promptGeneratorsContext';
-import { PromptGenerator } from './promptGenerator';
-import { v4 as uuidv4 } from "uuid";
-
-export default function TabsWrappedLabel() {
-  const [value, setValue] = React.useState('prompt-generators');
-  const [message, setMessage] = useState("");
-
-  const keywordsDispatch = useKeywordsDispatch();
-  const keywordTypesDispatch = useKeywordTypesDispatch();
-  const defaultCharactersDispatch = useDefaultCharactersDispatch();
-  const keywords = useKeywordsStore();
-  const keywordTypes = useKeywordTypesStore();
-  const defaultCharacters = useDefaultCharactersStore();
-  const promptGenerators = usePromptGeneratorsStore();
-  const promptGeneratorsDispatch = usePromptGeneratorsDispatch();
-
+import { Callout, Tabs, Tab } from "@blueprintjs/core";
+import { Data, PromptGeneratorsData } from "./data";
+import { useData, useGenerators } from "./contexts/v2Context";
+import { validateData } from "./domain/validation";
+import PromptGeneratorsTab from "./PromptGeneratorsTab";
+import ConceptsTab from "./ConceptsTab";
+import CategoriesTab from "./CategoriesTab";
+import AttributesTab from "./AttributesTab";
+import "./App.css";
+type TabId = "prompt" | "concepts" | "categories" | "attributes";
+export default function Workspace() {
+  const [data, setData] = useData();
+  const [generators, setGenerators] = useGenerators();
+  const [tab, setTab] = useState<TabId>("prompt");
+  const [selection, setSelection] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const conceptListScrollTop = useRef(0);
+  const categoryListScrollTop = useRef(0);
   useEffect(() => {
     invoke("load_configs")
-      .then((res) => {
-        const { data, prompt_generators: promptGenerators } = res as { data: Data, prompt_generators: PromptGenerator[] };
-        keywordsDispatch({ type: "SET_KEYWORDS", payload: data.keywords.map(keyword => ({ ...keyword, id: uuidv4() })) });
-        keywordTypesDispatch({ type: "SET_KEYWORD_TYPES", payload: data.keywordTypes });
-        defaultCharactersDispatch({ type: "SET_DEFAULT_CHARACTERS", payload: data.defaults });
-        if (promptGenerators.length > 0) {
-          promptGeneratorsDispatch({ type: "SET_PROMPT_GENERATORS", payload: promptGenerators });
-        }
+      .then((raw: any) => {
+        const d = raw.data as Data,
+          g = raw.prompt_generators as PromptGeneratorsData;
+        const errors = validateData(d, g);
+        if (errors.length) setError(errors.join("\n"));
+        setData({ type: "set", value: d });
+        setGenerators({ type: "set", value: g });
+        setSelection({
+          concepts: d.concepts[0]?.id ?? "",
+          categories: d.categories[0]?.id ?? "",
+          attributes: d.attributes[0]?.id ?? "",
+        });
+        setLoaded(true);
       })
-      .catch((err) => {
-        setMessage(String(err));
-      });
+      .catch((e) => setError(String(e)));
   }, []);
-
-  const keywordsRef = useRef(keywords);
-  const keywordTypesRef = useRef(keywordTypes);
-  const defaultCharactersRef = useRef(defaultCharacters);
-  const promptGeneratorsRef = useRef(promptGenerators);
-  useEffect(() => { keywordsRef.current = keywords; }, [keywords]);
-  useEffect(() => { keywordTypesRef.current = keywordTypes; }, [keywordTypes]);
-  useEffect(() => { defaultCharactersRef.current = defaultCharacters; }, [defaultCharacters]);
-  useEffect(() => { promptGeneratorsRef.current = promptGenerators; }, [promptGenerators]);
-
   useEffect(() => {
-    let cleanup: (() => void) | null = null;
-    let mounted = true;
-
-    (async () => {
-      const win = getCurrentWindow();
-      const unlisten = await win.onCloseRequested(async (event) => {
+    if (
+      error.includes(": empty matcher") &&
+      validateData(data, generators).length === 0
+    )
+      setError("");
+  }, [data, generators, error]);
+  useEffect(() => {
+    let off: (() => void) | undefined,
+      active = true;
+    getCurrentWindow()
+      .onCloseRequested(async (event) => {
+        if (!loaded) return;
+        const errors = validateData(data, generators);
+        if (errors.length) {
+          setError(errors.join("\n"));
+          event.preventDefault();
+          return;
+        }
         try {
-          console.log(
-            {
-              keywords: keywordsRef.current,
-              keywordTypes: keywordTypesRef.current,
-              defaults: defaultCharactersRef.current,
-              promptGenerators: promptGeneratorsRef.current
-            }
-          )
           await invoke("save_data", {
-            payload: {
-              keywords: keywordsRef.current.map(({ id, ...rest }) => rest),
-              keywordTypes: keywordTypesRef.current.map(({ id, ...rest }) => rest),
-              defaults: defaultCharactersRef.current,
-              promptGenerators: promptGeneratorsRef.current
-            }
+            payload: { data, promptGenerators: generators },
           });
-        } catch (e) {
-          console.error("save_data failed:", e);
+        } catch (error) {
+          setError(String(error));
           event.preventDefault();
         }
+      })
+      .then((dispose) => {
+        off = dispose;
+        if (!active) dispose();
       });
-
-      if (mounted) {
-        cleanup = unlisten;
-      } else {
-        unlisten();
-      }
-    })();
-
     return () => {
-      mounted = false;
-      if (cleanup) cleanup();
+      active = false;
+      off?.();
     };
-  }, []);
-
-  const handleChange = (_: React.SyntheticEvent, newValue: string) => {
-    setValue(newValue);
-  };
-
+  }, [data, generators, loaded]);
   return (
-    <Box sx={{ width: '100%' }}>
-      <Box
-        sx={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 1100,
-          bgcolor: 'background.paper',
-        }}
-      >
+    <div className="workspace">
+      <div className="workspace-tabs-header">
         <Tabs
-          value={value}
-          onChange={handleChange}
-          aria-label="wrapped label tabs example"
+          id="workspace-tabs"
+          selectedTabId={tab}
+          onChange={(id) => setTab(id as TabId)}
         >
-          <Tab value="prompt-generators" label="プロンプト生成" />
-          <Tab value="keywords" label="キーワード設定" />
-          <Tab value="keyword-types" label="キーワードのタイプ" />
+          <Tab id="prompt" title="プロンプト生成" />
+          <Tab id="concepts" title="コンセプト" />
+          <Tab id="categories" title="カテゴリ" />
+          <Tab id="attributes" title="属性" />
         </Tabs>
-      </Box>
-      <Box pt={4}>
-        <div>{message}</div>
-        {value === "prompt-generators" && <PromptGeneratorsTab />}
-        {value === "keywords" && <KeywordsTab />}
-        {value === "keyword-types" && <KeywordTypesTab />}
-      </Box>
-    </Box>
+      </div>
+      <main className="workspace-content">
+        {error && (
+          <Callout
+            intent="danger"
+            className="load-error"
+            style={{ whiteSpace: "pre-wrap" }}
+          >
+            {error}
+          </Callout>
+        )}
+        {tab === "prompt" ? (
+          <PromptGeneratorsTab
+            data={data}
+            generators={generators.promptGenerators}
+            onChange={(promptGenerators) =>
+              setGenerators({
+                type: "set",
+                value: { ...generators, promptGenerators },
+              })
+            }
+          />
+        ) : tab === "concepts" ? (
+          <ConceptsTab
+            data={data}
+            onChange={(d) => setData({ type: "set", value: d })}
+            generators={generators}
+            selectedId={selection.concepts ?? ""}
+            onSelect={(id) => setSelection((s) => ({ ...s, concepts: id }))}
+            onError={setError}
+            scrollTopRef={conceptListScrollTop}
+          />
+        ) : tab === "categories" ? (
+          <CategoriesTab
+            data={data}
+            onChange={(d) => setData({ type: "set", value: d })}
+            selectedId={selection.categories ?? ""}
+            onSelect={(id) => setSelection((s) => ({ ...s, categories: id }))}
+            onError={setError}
+            scrollTopRef={categoryListScrollTop}
+          />
+        ) : (
+          <AttributesTab
+            data={data}
+            onChange={(d) => setData({ type: "set", value: d })}
+            selectedId={selection.attributes ?? ""}
+            onSelect={(id) => setSelection((s) => ({ ...s, attributes: id }))}
+            onError={setError}
+          />
+        )}
+      </main>
+    </div>
   );
 }
