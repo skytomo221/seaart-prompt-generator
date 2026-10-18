@@ -29,7 +29,9 @@ export default function ConceptsTab({
       categoryId: data.categories[0]?.id ?? "",
       attributeIds: [],
       variantGroups: [],
-      presets: [{ id: uuid(), name: "", variantSelections: [] }],
+      presets: [
+        { id: uuid(), name: "新しいコンセプト", variantSelections: [] },
+      ],
       promptFragments: { root: [], definitions: [] },
       negativePromptFragments: { root: [], definitions: [] },
     };
@@ -43,13 +45,25 @@ export default function ConceptsTab({
     });
     onSelect(concept.id);
   };
-  const update = (concept: Concept) =>
+  const update = (concept: Concept) => {
+    const current = data.concepts.find((item) => item.id === concept.id);
+    const updated =
+      current &&
+      current.name !== concept.name &&
+      concept.variantGroups.length === 0 &&
+      concept.presets.length === 1
+        ? {
+            ...concept,
+            presets: [{ ...concept.presets[0], name: concept.name }],
+          }
+        : concept;
     onChange({
       ...data,
       concepts: data.concepts.map((item) =>
-        item.id === concept.id ? concept : item,
+        item.id === concept.id ? updated : item,
       ),
     });
+  };
   const remove = (
     kind: "concept" | "preset" | "variantGroup" | "variant",
     id: string,

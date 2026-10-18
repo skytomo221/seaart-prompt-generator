@@ -14,7 +14,7 @@ export default function PresetSelect({
 }) {
   const options = allPresets(data).map(({ concept, preset }) => ({
     id: preset.id,
-    label: preset.name,
+    label: concept.variantGroups.length === 0 ? concept.name : preset.name,
     category: data.categories.find((c) => c.id === concept.categoryId),
   }));
   const chosen = options.find((x) => x.id === presetId);

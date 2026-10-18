@@ -117,40 +117,42 @@ export default function ConceptEditor({
           </div>
         )}
       </section>
-      <section className="detail-section">
-        <div className="detail-section-label">プリセット</div>
-        {concept.presets.length ? (
-          concept.presets.map((preset) => (
-            <Card key={preset.id} compact className="editor-card">
-              <div>{preset.name || "名称未設定"}</div>
-              {preset.variantSelections.length ? (
-                <ul className="detail-view-list">
-                  {preset.variantSelections.map((item) => {
-                    const group = concept.variantGroups.find(
-                      (g) => g.id === item.groupId,
-                    );
-                    const variantId = item.variantId;
-                    const name =
-                      group?.variants.find((v) => v.id === variantId)?.name ??
-                      variantId;
-                    return (
-                      <li key={item.groupId}>
-                        {group?.name ?? item.groupId}: {name || "未設定"}
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <div className="detail-view-muted">
-                  バリアント選択はありません。
-                </div>
-              )}
-            </Card>
-          ))
-        ) : (
-          <div className="detail-view-muted">プリセットはありません。</div>
-        )}
-      </section>
+      {concept.variantGroups.length > 0 && (
+        <section className="detail-section">
+          <div className="detail-section-label">プリセット</div>
+          {concept.presets.length ? (
+            concept.presets.map((preset) => (
+              <Card key={preset.id} compact className="editor-card">
+                <div>{preset.name || "名称未設定"}</div>
+                {preset.variantSelections.length ? (
+                  <ul className="detail-view-list">
+                    {preset.variantSelections.map((item) => {
+                      const group = concept.variantGroups.find(
+                        (g) => g.id === item.groupId,
+                      );
+                      const variantId = item.variantId;
+                      const name =
+                        group?.variants.find((v) => v.id === variantId)?.name ??
+                        variantId;
+                      return (
+                        <li key={item.groupId}>
+                          {group?.name ?? item.groupId}: {name || "未設定"}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <div className="detail-view-muted">
+                    バリアント選択はありません。
+                  </div>
+                )}
+              </Card>
+            ))
+          ) : (
+            <div className="detail-view-muted">プリセットはありません。</div>
+          )}
+        </section>
+      )}
       <PromptFragmentEditor
         readOnly
         label="フラグメント"
@@ -306,102 +308,104 @@ export default function ConceptEditor({
           バリアントグループを追加
         </Button>
       </section>
-      <section className="detail-section">
-        <div className="detail-section-label">プリセット</div>
-        {concept.presets.map((preset, index) => (
-          <Card key={preset.id} compact className="editor-card">
-            <div className="preset-edit-header">
-              <InputGroup
-                value={preset.name}
-                onChange={(event) =>
-                  patch({
-                    presets: concept.presets.map((item) =>
-                      item.id === preset.id
-                        ? { ...item, name: event.currentTarget.value }
-                        : item,
-                    ),
-                  })
-                }
-              />
-              <Button
-                icon="arrow-up"
-                aria-label="プリセットを上へ"
-                disabled={!index}
-                onClick={() => {
-                  const items = [...concept.presets];
-                  [items[index - 1], items[index]] = [
-                    items[index],
-                    items[index - 1],
-                  ];
-                  patch({ presets: items });
-                }}
-              />
-              <Button
-                icon="arrow-down"
-                aria-label="プリセットを下へ"
-                disabled={index === concept.presets.length - 1}
-                onClick={() => {
-                  const items = [...concept.presets];
-                  [items[index], items[index + 1]] = [
-                    items[index + 1],
-                    items[index],
-                  ];
-                  patch({ presets: items });
-                }}
-              />
-              {showDangerous && (
-                <Button
-                  icon="trash"
-                  intent="danger"
-                  variant="minimal"
-                  aria-label="プリセットを削除"
-                  onClick={() => onDeletePreset(preset.id)}
-                />
-              )}
-            </div>
-            {concept.variantGroups.map((group) => (
-              <FormGroup
-                key={group.id}
-                label={group.name}
-                className="preset-variant-group"
-              >
-                <HTMLSelect
-                  fill
-                  value={selection(preset, group.id) ?? ""}
+      {concept.variantGroups.length > 0 && (
+        <section className="detail-section">
+          <div className="detail-section-label">プリセット</div>
+          {concept.presets.map((preset, index) => (
+            <Card key={preset.id} compact className="editor-card">
+              <div className="preset-edit-header">
+                <InputGroup
+                  value={preset.name}
                   onChange={(event) =>
-                    changeSelection(
-                      preset.id,
-                      group.id,
-                      event.currentTarget.value || undefined,
-                    )
+                    patch({
+                      presets: concept.presets.map((item) =>
+                        item.id === preset.id
+                          ? { ...item, name: event.currentTarget.value }
+                          : item,
+                      ),
+                    })
                   }
+                />
+                <Button
+                  icon="arrow-up"
+                  aria-label="プリセットを上へ"
+                  disabled={!index}
+                  onClick={() => {
+                    const items = [...concept.presets];
+                    [items[index - 1], items[index]] = [
+                      items[index],
+                      items[index - 1],
+                    ];
+                    patch({ presets: items });
+                  }}
+                />
+                <Button
+                  icon="arrow-down"
+                  aria-label="プリセットを下へ"
+                  disabled={index === concept.presets.length - 1}
+                  onClick={() => {
+                    const items = [...concept.presets];
+                    [items[index], items[index + 1]] = [
+                      items[index + 1],
+                      items[index],
+                    ];
+                    patch({ presets: items });
+                  }}
+                />
+                {showDangerous && (
+                  <Button
+                    icon="trash"
+                    intent="danger"
+                    variant="minimal"
+                    aria-label="プリセットを削除"
+                    onClick={() => onDeletePreset(preset.id)}
+                  />
+                )}
+              </div>
+              {concept.variantGroups.map((group) => (
+                <FormGroup
+                  key={group.id}
+                  label={group.name}
+                  className="preset-variant-group"
                 >
-                  <option value="">未選択</option>
-                  {group.variants.map((variant) => (
-                    <option key={variant.id} value={variant.id}>
-                      {variant.name}
-                    </option>
-                  ))}
-                </HTMLSelect>
-              </FormGroup>
-            ))}
-          </Card>
-        ))}
-        <Button
-          small
-          icon="add"
-          onClick={() =>
-            patch({
-              presets: [
-                ...concept.presets,
-                { id: uuid(), name: concept.name, variantSelections: [] },
-              ],
-            })
-          }
-        >
-          プリセットを追加
-        </Button>
-      </section>
+                  <HTMLSelect
+                    fill
+                    value={selection(preset, group.id) ?? ""}
+                    onChange={(event) =>
+                      changeSelection(
+                        preset.id,
+                        group.id,
+                        event.currentTarget.value || undefined,
+                      )
+                    }
+                  >
+                    <option value="">未選択</option>
+                    {group.variants.map((variant) => (
+                      <option key={variant.id} value={variant.id}>
+                        {variant.name}
+                      </option>
+                    ))}
+                  </HTMLSelect>
+                </FormGroup>
+              ))}
+            </Card>
+          ))}
+          <Button
+            small
+            icon="add"
+            onClick={() =>
+              patch({
+                presets: [
+                  ...concept.presets,
+                  { id: uuid(), name: concept.name, variantSelections: [] },
+                ],
+              })
+            }
+          >
+            プリセットを追加
+          </Button>
+        </section>
+      )}
       <PromptFragmentEditor
         label="フラグメント"
         value={concept.promptFragments}
