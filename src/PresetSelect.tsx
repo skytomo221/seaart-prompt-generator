@@ -1,26 +1,21 @@
 import { MenuItem } from "@blueprintjs/core";
 import { Suggest, type ItemRenderer } from "@blueprintjs/select";
-import { Data, Id } from "./data";
-import { allPresets } from "./domain/presets";
+import { Id } from "./data";
+import { PresetOption } from "./domain/dataIndex";
 
 export default function PresetSelect({
   presetId,
-  data,
+  options,
   onChange,
 }: {
   presetId?: Id;
-  data: Data;
+  options: PresetOption[];
   onChange: (id?: string) => void;
 }) {
-  const options = allPresets(data).map(({ concept, preset }) => ({
-    id: preset.id,
-    label: concept.variantGroups.length === 0 ? concept.name : preset.name,
-    category: data.categories.find((c) => c.id === concept.categoryId),
-  }));
-  const chosen = options.find((x) => x.id === presetId);
-  type Item = (typeof options)[number] | { id: "__blank"; label: string };
-  const blank: Item = { id: "__blank", label: "空白" };
-  const items: Item[] = [blank, ...options];
+  const chosen = options.find((x) => x.id === presetId && x.id !== "__blank");
+  type Item = PresetOption;
+  const blank = options[0];
+  const items = options;
   const render: ItemRenderer<Item> = (item, { modifiers, handleClick, ref }) =>
     !modifiers.matchesPredicate ? null : (
       <MenuItem
@@ -31,10 +26,10 @@ export default function PresetSelect({
         onClick={handleClick}
         roleStructure="listoption"
         style={
-          "category" in item
+          item.id !== "__blank"
             ? {
-                color: item.category?.color,
-                backgroundColor: item.category?.backgroundColor,
+                color: item.color,
+                backgroundColor: item.backgroundColor,
               }
             : undefined
         }
@@ -64,8 +59,8 @@ export default function PresetSelect({
       resetOnClose
       inputProps={{
         style: {
-          color: chosen?.category?.color,
-          backgroundColor: chosen?.category?.backgroundColor,
+          color: chosen?.color,
+          backgroundColor: chosen?.backgroundColor,
         },
       }}
       className="preset-suggest"

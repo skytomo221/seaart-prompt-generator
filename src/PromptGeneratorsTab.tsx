@@ -1,3 +1,6 @@
+import { useMemo } from "react";
+import { useStableEvent } from "./useStableEvent";
+import { createDataIndex } from "./domain/dataIndex";
 import { Button } from "@blueprintjs/core";
 import {
   closestCenter,
@@ -27,11 +30,12 @@ export default function PromptGeneratorsTab({
   generators: PromptGenerator[];
   onChange: (generators: PromptGenerator[]) => void;
 }) {
+  const dataIndex = useMemo(() => createDataIndex(data), [data]);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
   const add = () => onChange([...generators, { id: uuid(), instances: [] }]);
-  const clone = (source: number, at: number) => {
+  const clone = useStableEvent((source: number, at: number) => {
     const original = generators[source];
     if (!original) return;
     const copy = {
@@ -45,15 +49,15 @@ export default function PromptGeneratorsTab({
       })),
     };
     onChange([...generators.slice(0, at), copy, ...generators.slice(at)]);
-  };
-  const change = (generator: PromptGenerator) =>
+  });
+  const change = useStableEvent((generator: PromptGenerator) =>
     onChange(
-      generators.map((item) =>
-        item.id === generator.id ? generator : item,
-      ),
-    );
-  const remove = (id: string) =>
-    onChange(generators.filter((item) => item.id !== id));
+      generators.map((item) => (item.id === generator.id ? generator : item)),
+    ),
+  );
+  const remove = useStableEvent((id: string) =>
+    onChange(generators.filter((item) => item.id !== id)),
+  );
   const reorder = (event: DragEndEvent) => {
     if (!event.over || event.active.id === event.over.id) return;
     const from = generators.findIndex(
@@ -84,9 +88,10 @@ export default function PromptGeneratorsTab({
                     generator={generator}
                     index={index}
                     data={data}
+                    dataIndex={dataIndex}
                     onChange={change}
                     onClone={clone}
-                    onDelete={() => remove(generator.id)}
+                    onDelete={remove}
                   />
                 </motion.div>
               ))}

@@ -45,11 +45,16 @@ export default function Workspace() {
     )
       setError("");
   }, [data, generators, error]);
+  const saveState = useRef({ data, generators, loaded });
+  useEffect(() => {
+    saveState.current = { data, generators, loaded };
+  }, [data, generators, loaded]);
   useEffect(() => {
     let off: (() => void) | undefined,
       active = true;
     getCurrentWindow()
       .onCloseRequested(async (event) => {
+        const { data, generators, loaded } = saveState.current;
         if (!loaded) return;
         const errors = validateData(data, generators);
         if (errors.length) {
@@ -74,7 +79,7 @@ export default function Workspace() {
       active = false;
       off?.();
     };
-  }, [data, generators, loaded]);
+  }, []);
   return (
     <div className="workspace">
       <div className="workspace-tabs-header">

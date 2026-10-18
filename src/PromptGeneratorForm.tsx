@@ -26,11 +26,19 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Fragment, useState } from "react";
+import {
+  Fragment,
+  useState,
+  useMemo,
+  memo,
+  createContext,
+  useContext,
+} from "react";
+import { DataIndex } from "./domain/dataIndex";
+import { useStableEvent } from "./useStableEvent";
 import { v4 as uuid } from "uuid";
 import { ConceptInstance, Data, PromptGenerator } from "./data";
 import { evaluatePrompt } from "./domain/evaluatePrompt";
-import { findPreset } from "./domain/presets";
 import InsertButton from "./InsertButton";
 import PresetSelect from "./PresetSelect";
 import ResultText from "./ResultText";
@@ -155,10 +163,10 @@ function AddInstanceDragOverlay() {
 
 function ExistingInstanceDragOverlay({
   instance,
-  data,
+  dataIndex,
 }: {
   instance: ConceptInstance;
-  data: Data;
+  dataIndex: DataIndex;
 }) {
   return (
     <div
@@ -173,7 +181,7 @@ function ExistingInstanceDragOverlay({
       />
       <PresetSelect
         presetId={instance.presetId}
-        data={data}
+        options={dataIndex.presetOptions}
         onChange={() => {}}
       />
     </div>
@@ -205,30 +213,67 @@ function DeleteInstanceDropZone() {
   );
 }
 
-export default function PromptGeneratorForm({
-  generator,
-  index,
-  data,
-  onChange,
-  onClone,
-  onDelete,
-}: {
+interface FormProps {
   generator: PromptGenerator;
   index: number;
   data: Data;
+  dataIndex: DataIndex;
   onChange: (g: PromptGenerator) => void;
   onClone: (source: number, at: number) => void;
-  onDelete: () => void;
-}) {
-  const {
-    attributes: formDragAttributes,
-    listeners: formDragListeners,
-    setNodeRef: setFormNodeRef,
-    setActivatorNodeRef: setFormDragHandleRef,
-    transform: formTransform,
-    transition: formTransition,
-    isDragging: isFormDragging,
-  } = useSortable({ id: generator.id });
+  onDelete: (id: string) => void;
+}
+const FormDragContext = createContext<ReturnType<typeof useSortable> | null>(
+  null,
+);
+function FormDragHandle() {
+  const sortable = useContext(FormDragContext)!;
+  return (
+    <span
+      ref={sortable.setActivatorNodeRef}
+      className="flex-spacer"
+      {...sortable.attributes}
+      {...sortable.listeners}
+      aria-label="プロンプト生成フォームを移動"
+      style={{
+        alignSelf: "stretch",
+        cursor: sortable.isDragging ? "grabbing" : "grab",
+        touchAction: "none",
+      }}
+    />
+  );
+}
+export default function PromptGeneratorForm(props: FormProps) {
+  const sortable = useSortable({ id: props.generator.id });
+  const transform = sortable.transform;
+  return (
+    <Card
+      ref={sortable.setNodeRef}
+      compact
+      className="prompt-generator-card"
+      style={{
+        transform: transform
+          ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
+          : undefined,
+        transition: sortable.transition,
+        position: "relative",
+        zIndex: sortable.isDragging ? 1 : undefined,
+      }}
+    >
+      <FormDragContext.Provider value={sortable}>
+        <PromptGeneratorFormContent {...props} />
+      </FormDragContext.Provider>
+    </Card>
+  );
+}
+const PromptGeneratorFormContent = memo(function PromptGeneratorFormContent({
+  generator,
+  index,
+  data,
+  dataIndex,
+  onChange,
+  onClone,
+  onDelete,
+}: FormProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
@@ -244,7 +289,9 @@ export default function PromptGeneratorForm({
     });
   const moveToInsertionPoint = (activeId: string, insertionIndex: number) =>
     update((g) => {
-      const from = g.instances.findIndex((instance) => instance.id === activeId);
+      const from = g.instances.findIndex(
+        (instance) => instance.id === activeId,
+      );
       if (from < 0) return g;
       const instances = [...g.instances];
       const [instance] = instances.splice(from, 1);
@@ -253,40 +300,41 @@ export default function PromptGeneratorForm({
       instances.splice(to, 0, instance);
       return { ...g, instances };
     });
-  const setPreset = (instanceId: string, presetId?: string) =>
+  const setPreset = useStableEvent((instanceId: string, presetId?: string) =>
     update((g) => ({
       ...g,
       instances: g.instances.map((instance) => {
         if (instance.id !== instanceId) return instance;
         if (!presetId) return { id: instance.id, variantSelections: [] };
-        const resolved = findPreset(data, presetId);
+        const resolved = dataIndex.presetById.get(presetId);
         if (!resolved) return instance;
         return {
           id: instance.id,
           conceptId: resolved.concept.id,
           presetId: resolved.preset.id,
-          variantSelections: resolved.preset.variantSelections.map((selection) => ({
-            ...selection,
-          })),
+          variantSelections: resolved.preset.variantSelections.map(
+            (selection) => ({
+              ...selection,
+            }),
+          ),
         };
       }),
-    }));
-  const setVariant = (
-    instanceId: string,
-    groupId: string,
-    variantId?: string,
-  ) =>
-    update((g) => ({
-      ...g,
-      instances: g.instances.map((instance) => {
-        if (instance.id !== instanceId) return instance;
-        const variantSelections = instance.variantSelections.filter(
-          (selection) => selection.groupId !== groupId,
-        );
-        if (variantId) variantSelections.push({ groupId, variantId });
-        return { ...instance, variantSelections };
-      }),
-    }));
+    })),
+  );
+  const setVariant = useStableEvent(
+    (instanceId: string, groupId: string, variantId?: string) =>
+      update((g) => ({
+        ...g,
+        instances: g.instances.map((instance) => {
+          if (instance.id !== instanceId) return instance;
+          const variantSelections = instance.variantSelections.filter(
+            (selection) => selection.groupId !== groupId,
+          );
+          if (variantId) variantSelections.push({ groupId, variantId });
+          return { ...instance, variantSelections };
+        }),
+      })),
+  );
   const collisionDetection: CollisionDetection = (args) => {
     if (args.active.data.current?.type === "new-instance") {
       return pointerWithin({
@@ -348,26 +396,15 @@ export default function PromptGeneratorForm({
     if (from >= 0 && to >= 0)
       update((g) => ({ ...g, instances: arrayMove(g.instances, from, to) }));
   };
-  const out = evaluatePrompt(generator, data);
+  const out = useMemo(
+    () => evaluatePrompt(generator, data, dataIndex),
+    [generator, data, dataIndex],
+  );
   const activeInstance = activeDragId
     ? generator.instances.find((instance) => instance.id === activeDragId)
     : undefined;
-  const formTransformStyle = formTransform
-    ? `translate3d(${formTransform.x}px, ${formTransform.y}px, 0)`
-    : undefined;
-
   return (
-    <Card
-      ref={setFormNodeRef}
-      compact
-      className="prompt-generator-card"
-      style={{
-        transform: formTransformStyle,
-        transition: formTransition,
-        position: "relative",
-        zIndex: isFormDragging ? 1 : undefined,
-      }}
-    >
+    <>
       <header className="prompt-generator-header">
         <span className="prompt-generator-title">#{index + 1}</span>
         <Popover
@@ -377,7 +414,7 @@ export default function PromptGeneratorForm({
                 icon="trash"
                 intent="danger"
                 text="削除する"
-                onClick={onDelete}
+                onClick={() => onDelete(generator.id)}
               />
             </Menu>
           }
@@ -413,13 +450,9 @@ export default function PromptGeneratorForm({
               <Fragment key={instance.id}>
                 <SortableInstance
                   instance={instance}
-                  data={data}
-                  onPresetChange={(presetId) =>
-                    setPreset(instance.id, presetId)
-                  }
-                  onVariantChange={(groupId, variantId) =>
-                    setVariant(instance.id, groupId, variantId)
-                  }
+                  dataIndex={dataIndex}
+                  onPresetChange={setPreset}
+                  onVariantChange={setVariant}
                 />
                 <InstanceInsertTarget
                   index={instanceIndex + 1}
@@ -429,7 +462,9 @@ export default function PromptGeneratorForm({
               </Fragment>
             ))}
           </SortableContext>
-          <AddInstanceButton onClick={() => insert(generator.instances.length)} />
+          <AddInstanceButton
+            onClick={() => insert(generator.instances.length)}
+          />
           {activeDragKind === "instance" && <DeleteInstanceDropZone />}
           <DragOverlay dropAnimation={null}>
             {activeDragKind === "new-instance" ? (
@@ -437,7 +472,7 @@ export default function PromptGeneratorForm({
             ) : activeDragKind === "instance" && activeInstance ? (
               <ExistingInstanceDragOverlay
                 instance={activeInstance}
-                data={data}
+                dataIndex={dataIndex}
               />
             ) : null}
           </DragOverlay>
@@ -461,18 +496,7 @@ export default function PromptGeneratorForm({
             onClick={() => onClone(index, index)}
           />
         </Tooltip>
-        <span
-          ref={setFormDragHandleRef}
-          className="flex-spacer"
-          {...formDragAttributes}
-          {...formDragListeners}
-          aria-label="プロンプト生成フォームを移動"
-          style={{
-            alignSelf: "stretch",
-            cursor: isFormDragging ? "grabbing" : "grab",
-            touchAction: "none",
-          }}
-        />
+        <FormDragHandle />
         <Tooltip content="右側に複製する">
           <Button
             icon="add-column-right"
@@ -483,6 +507,6 @@ export default function PromptGeneratorForm({
           />
         </Tooltip>
       </footer>
-    </Card>
+    </>
   );
-}
+});

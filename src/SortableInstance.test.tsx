@@ -1,3 +1,4 @@
+import { createDataIndex } from "./domain/dataIndex";
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
@@ -77,6 +78,7 @@ const data: Data = {
     },
   ],
 };
+const dataIndex = createDataIndex(data);
 const instance: ConceptInstance = {
   id: "a",
   conceptId: "skirt",
@@ -93,7 +95,7 @@ it("starts collapsed, exposes all groups, and preserves selection and handle cal
   const { container } = render(
     <SortableInstance
       instance={instance}
-      data={data}
+      dataIndex={dataIndex}
       onPresetChange={vi.fn()}
       onVariantChange={onVariantChange}
     />,
@@ -111,7 +113,7 @@ it("starts collapsed, exposes all groups, and preserves selection and handle cal
   fireEvent.change(screen.getAllByRole("combobox")[1], {
     target: { value: "white" },
   });
-  expect(onVariantChange).toHaveBeenCalledWith("color", "white");
+  expect(onVariantChange).toHaveBeenCalledWith("a", "color", "white");
   fireEvent.click(toggle);
   expect(screen.queryByText("色：")).toBeNull();
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
@@ -123,19 +125,24 @@ it("starts collapsed, exposes all groups, and preserves selection and handle cal
 
 it("collapses on preset selection and hides details and toggle for blank or groupless concepts", () => {
   const onPresetChange = vi.fn();
-  const props = { instance, data, onPresetChange, onVariantChange: vi.fn() };
+  const props = {
+    instance,
+    dataIndex,
+    onPresetChange,
+    onVariantChange: vi.fn(),
+  };
   const { rerender, container } = render(<SortableInstance {...props} />);
   fireEvent.click(screen.getByRole("button", { name: "Variant詳細を開く" }));
   fireEvent.change(screen.getAllByRole("combobox")[0], {
     target: { value: "girl-preset" },
   });
-  expect(onPresetChange).toHaveBeenLastCalledWith("girl-preset");
+  expect(onPresetChange).toHaveBeenLastCalledWith("a", "girl-preset");
   expect(screen.queryByText("色：")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Variant詳細を開く" }));
   fireEvent.change(screen.getAllByRole("combobox")[0], {
     target: { value: "__blank" },
   });
-  expect(onPresetChange).toHaveBeenLastCalledWith(undefined);
+  expect(onPresetChange).toHaveBeenLastCalledWith("a", undefined);
   expect(screen.queryByText("色：")).toBeNull();
   for (const next of [
     { id: "a", variantSelections: [] },
@@ -163,7 +170,7 @@ it("allows multiple instances to stay expanded independently", () => {
         <SortableInstance
           key={item.id}
           instance={item}
-          data={data}
+          dataIndex={dataIndex}
           onPresetChange={vi.fn()}
           onVariantChange={vi.fn()}
         />

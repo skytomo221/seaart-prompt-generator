@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { createDataIndex } from "./dataIndex";
+import { describe, expect, it, vi } from "vitest";
 import { Data, PromptGenerator } from "../data";
 import {
   evaluateCondition,
@@ -458,4 +459,123 @@ describe("V2 named fragment evaluator", () => {
       "ribbon",
       "ribbon",
     ]));
+});
+
+// Fixed expected strings cover both channels and edited variants through the same conditions.
+it("preserves conditional positive/negative fragments and self variant cases", () => {
+  const x: Data = {
+    ...d,
+    concepts: d.concepts.map((concept) =>
+      concept.id !== "b"
+        ? concept
+        : {
+            ...concept,
+            promptFragments: {
+              root: [
+                "base",
+                { fragmentId: "conditions" },
+                { fragmentId: "variant" },
+              ],
+              definitions: [
+                {
+                  id: "conditions",
+                  name: "conditions",
+                  if: {
+                    all: [
+                      {
+                        attribute: {
+                          attributeId: "life",
+                          operator: "is",
+                          existence: "exists",
+                        },
+                      },
+                      {
+                        category: {
+                          categoryId: "char",
+                          operator: "is",
+                          existence: "exists",
+                        },
+                      },
+                      {
+                        preset: {
+                          presetId: "pa",
+                          operator: "is",
+                          existence: "exists",
+                        },
+                      },
+                      {
+                        concept: {
+                          conceptId: "a",
+                          operator: "is",
+                          existence: "exists",
+                        },
+                      },
+                    ],
+                  },
+                  fragments: ["matched"],
+                },
+                {
+                  id: "variant",
+                  name: "variant",
+                  if: {
+                    selfVariantGroup: {
+                      groupId: "g",
+                      cases: [
+                        { variantId: "v", fragments: ["one"] },
+                        { variantId: "v2", fragments: ["two"] },
+                      ],
+                    },
+                  },
+                  fragments: [],
+                },
+              ],
+            },
+            negativePromptFragments: {
+              root: [{ fragmentId: "negative" }],
+              definitions: [
+                {
+                  id: "negative",
+                  name: "negative",
+                  if: {
+                    attribute: {
+                      attributeId: "life",
+                      operator: "is",
+                      existence: "exists",
+                    },
+                  },
+                  fragments: ["conditional negative"],
+                },
+              ],
+            },
+          },
+    ),
+  };
+  const generator = gen(["pa", "pb"]);
+  const index = createDataIndex(x);
+  const lookup = vi.spyOn(index.attributeById, "get");
+  expect(evaluatePrompt(generator, x, index)).toMatchObject({
+    prompt: "same,same,base,matched,one",
+    negativePrompt: "neg,conditional negative",
+  });
+  // The same first instance satisfies both attribute conditions; its implied closure is built once.
+  expect(lookup).toHaveBeenCalledTimes(3);
+  const edited = {
+    ...generator,
+    instances: generator.instances.map((instance) =>
+      instance.conceptId !== "b"
+        ? instance
+        : {
+            ...instance,
+            variantSelections: [{ groupId: "g", variantId: "v2" }],
+          },
+    ),
+  };
+  expect(evaluatePrompt(edited, x, index)).toMatchObject({
+    prompt: "same,same,base,matched,two",
+    negativePrompt: "neg,conditional negative",
+  });
+  expect(evaluatePrompt(gen(["pb"]), x, index)).toMatchObject({
+    prompt: "base,one",
+    negativePrompt: "conditional negative",
+  });
 });

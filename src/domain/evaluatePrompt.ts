@@ -10,7 +10,11 @@ import {
   PromptGenerator,
   VariantRequirement,
 } from "../data";
-import { findPreset } from "./presets";
+import { createDataIndex, DataIndex } from "./dataIndex";
+
+function createEvaluation(data: Data, index = createDataIndex(data)) {
+  return { index, attributes: new Map<RuntimeInstance, Set<Id>>() };
+}
 
 export interface RuntimeInstance {
   key: string;
@@ -22,12 +26,13 @@ export interface RuntimeInstance {
 export function resolveInstances(
   generator: PromptGenerator,
   data: Data,
+  index = createDataIndex(data),
 ): RuntimeInstance[] {
   const result: RuntimeInstance[] = [];
   for (const instance of generator.instances) {
     if (!instance.conceptId || !instance.presetId) continue;
-    const concept = data.concepts.find((item) => item.id === instance.conceptId);
-    const resolved = findPreset(data, instance.presetId);
+    const concept = index.conceptById.get(instance.conceptId);
+    const resolved = index.presetById.get(instance.presetId);
     if (!concept || !resolved || resolved.concept.id !== concept.id) continue;
     result.push({
       key: instance.id,
@@ -42,11 +47,10 @@ export function resolveInstances(
 export function getEffectiveAttributes(
   item: RuntimeInstance,
   data: Data,
+  index = createDataIndex(data),
 ): Set<Id> {
   const ids = new Set<Id>();
-  const category = data.categories.find(
-    (candidate) => candidate.id === item.concept.categoryId,
-  );
+  const category = index.categoryById.get(item.concept.categoryId);
   category?.attributeIds.forEach((id) => ids.add(id));
   item.concept.attributeIds.forEach((id) => ids.add(id));
   for (const selection of item.instance.variantSelections) {
@@ -60,9 +64,7 @@ export function getEffectiveAttributes(
   const pending = [...ids];
   while (pending.length) {
     const current = pending.pop()!;
-    for (const implied of data.attributes.find(
-      (attribute) => attribute.id === current,
-    )?.implies ?? []) {
+    for (const implied of index.attributeById.get(current)?.implies ?? []) {
       if (!ids.has(implied)) {
         ids.add(implied);
         pending.push(implied);
@@ -95,14 +97,15 @@ export function evaluateCondition(
   condition: Condition,
   environment: RuntimeInstance[],
   data: Data,
+  evaluation = createEvaluation(data),
 ): boolean {
   if ("all" in condition)
     return condition.all.every((child) =>
-      evaluateCondition(child, environment, data),
+      evaluateCondition(child, environment, data, evaluation),
     );
   if ("any" in condition)
     return condition.any.some((child) =>
-      evaluateCondition(child, environment, data),
+      evaluateCondition(child, environment, data, evaluation),
     );
   if ("category" in condition) {
     const matched = environment.some((item) => {
@@ -113,9 +116,12 @@ export function evaluateCondition(
   }
   if ("attribute" in condition) {
     const matched = environment.some((item) => {
-      const equal = getEffectiveAttributes(item, data).has(
-        condition.attribute.attributeId,
-      );
+      let attributes = evaluation.attributes.get(item);
+      if (!attributes) {
+        attributes = getEffectiveAttributes(item, data, evaluation.index);
+        evaluation.attributes.set(item, attributes);
+      }
+      const equal = attributes.has(condition.attribute.attributeId);
       return condition.attribute.operator === "is" ? equal : !equal;
     });
     return applyExistence(matched, condition.attribute.existence);
@@ -150,6 +156,10 @@ export function evaluateFragments(
   environment: RuntimeInstance[],
   data: Data,
   resolving: ReadonlySet<Id> = new Set(),
+  evaluation = createEvaluation(data),
+  definitions = new Map(
+    set.definitions.map((definition) => [definition.id, definition]),
+  ),
 ): string[] {
   const output: string[] = [];
   for (const fragment of fragments) {
@@ -157,9 +167,7 @@ export function evaluateFragments(
       output.push(fragment);
       continue;
     }
-    const definition = set.definitions.find(
-      (candidate) => candidate.id === fragment.fragmentId,
-    );
+    const definition = definitions.get(fragment.fragmentId);
     if (!definition || resolving.has(definition.id)) continue;
 
     let selectedFragments: PromptFragment[] | undefined;
@@ -173,7 +181,8 @@ export function evaluateFragments(
       )?.fragments;
       if (!selectedFragments) continue;
     } else {
-      if (!evaluateCondition(definition.if, environment, data)) continue;
+      if (!evaluateCondition(definition.if, environment, data, evaluation))
+        continue;
       selectedFragments = definition.fragments;
     }
 
@@ -187,6 +196,8 @@ export function evaluateFragments(
         environment,
         data,
         nextResolving,
+        evaluation,
+        definitions,
       ),
     );
   }
@@ -198,20 +209,38 @@ export function evaluateConceptInstance(
   environment: RuntimeInstance[],
   data: Data,
   negative = false,
+  evaluation = createEvaluation(data),
 ): string[] {
   const set = negative
     ? self.concept.negativePromptFragments
     : self.concept.promptFragments;
-  return evaluateFragments(set.root, set, self, environment, data);
+  return evaluateFragments(
+    set.root,
+    set,
+    self,
+    environment,
+    data,
+    new Set(),
+    evaluation,
+  );
 }
 
-export function evaluatePrompt(generator: PromptGenerator, data: Data) {
-  const environment = resolveInstances(generator, data);
+export function evaluatePrompt(
+  generator: PromptGenerator,
+  data: Data,
+  index: DataIndex = createDataIndex(data),
+) {
+  const evaluation = createEvaluation(data, index);
+  const environment = resolveInstances(generator, data, index);
   const positive: string[] = [];
   const negative: string[] = [];
   for (const item of environment) {
-    positive.push(...evaluateConceptInstance(item, environment, data));
-    negative.push(...evaluateConceptInstance(item, environment, data, true));
+    positive.push(
+      ...evaluateConceptInstance(item, environment, data, false, evaluation),
+    );
+    negative.push(
+      ...evaluateConceptInstance(item, environment, data, true, evaluation),
+    );
   }
   return {
     prompt: positive.join(","),

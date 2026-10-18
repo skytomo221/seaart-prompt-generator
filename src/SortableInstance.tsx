@@ -2,8 +2,9 @@ import { Button, MenuItem } from "@blueprintjs/core";
 import { Suggest, type ItemRenderer } from "@blueprintjs/select";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useState } from "react";
-import { ConceptInstance, Data, VariantGroup } from "./data";
+import { useState, memo, createContext, useContext, useCallback } from "react";
+import { DataIndex } from "./domain/dataIndex";
+import { ConceptInstance, VariantGroup } from "./data";
 import PresetSelect from "./PresetSelect";
 
 function VariantSelect({
@@ -60,18 +61,32 @@ function VariantSelect({
   );
 }
 
-export default function SortableInstance({
-  instance,
-  data,
-  onPresetChange,
-  onVariantChange,
-}: {
+interface InstanceProps {
   instance: ConceptInstance;
-  data: Data;
-  onPresetChange: (id?: string) => void;
-  onVariantChange: (groupId: string, variantId?: string) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
+  dataIndex: DataIndex;
+  onPresetChange: (instanceId: string, id?: string) => void;
+  onVariantChange: (
+    instanceId: string,
+    groupId: string,
+    variantId?: string,
+  ) => void;
+}
+const InstanceDragContext =
+  createContext<ReturnType<typeof useSortable>["listeners"]>(undefined);
+function InstanceDragHandle() {
+  const listeners = useContext(InstanceDragContext);
+  return (
+    <Button
+      {...listeners}
+      icon="drag-handle-vertical"
+      variant="minimal"
+      size="small"
+      aria-label="ドラッグして並べ替え"
+      style={{ flex: "0 0 auto", cursor: "grab" }}
+    />
+  );
+}
+export default function SortableInstance(props: InstanceProps) {
   const {
     attributes,
     listeners,
@@ -80,14 +95,9 @@ export default function SortableInstance({
     transition,
     isDragging,
   } = useSortable({
-    id: instance.id,
+    id: props.instance.id,
     data: { type: "instance" },
   });
-  const concept = instance.conceptId
-    ? data.concepts.find((item) => item.id === instance.conceptId)
-    : undefined;
-  const hasVariants = (concept?.variantGroups.length ?? 0) > 0;
-
   return (
     <div
       ref={setNodeRef}
@@ -102,6 +112,33 @@ export default function SortableInstance({
       }}
       {...attributes}
     >
+      <InstanceDragContext.Provider value={listeners}>
+        <InstanceContent {...props} />
+      </InstanceDragContext.Provider>
+    </div>
+  );
+}
+const InstanceContent = memo(function InstanceContent({
+  instance,
+  dataIndex,
+  onPresetChange,
+  onVariantChange,
+}: InstanceProps) {
+  const [expanded, setExpanded] = useState(false);
+  const changePreset = useCallback(
+    (id?: string) => {
+      setExpanded(false);
+      onPresetChange(instance.id, id);
+    },
+    [instance.id, onPresetChange],
+  );
+  const concept = instance.conceptId
+    ? dataIndex.conceptById.get(instance.conceptId)
+    : undefined;
+  const hasVariants = (concept?.variantGroups.length ?? 0) > 0;
+
+  return (
+    <>
       <div
         style={{
           display: "flex",
@@ -110,22 +147,12 @@ export default function SortableInstance({
           width: "100%",
         }}
       >
-        <Button
-          {...listeners}
-          icon="drag-handle-vertical"
-          variant="minimal"
-          size="small"
-          aria-label="ドラッグして並べ替え"
-          style={{ flex: "0 0 auto", cursor: "grab" }}
-        />
+        <InstanceDragHandle />
         <div style={{ flex: "1 1 auto", minWidth: 0 }}>
           <PresetSelect
             presetId={instance.presetId}
-            data={data}
-            onChange={(id) => {
-              setExpanded(false);
-              onPresetChange(id);
-            }}
+            options={dataIndex.presetOptions}
+            onChange={changePreset}
           />
         </div>
         {hasVariants && (
@@ -161,11 +188,13 @@ export default function SortableInstance({
               <VariantSelect
                 group={group}
                 selectedId={selectedId}
-                onChange={(variantId) => onVariantChange(group.id, variantId)}
+                onChange={(variantId) =>
+                  onVariantChange(instance.id, group.id, variantId)
+                }
               />
             </div>
           );
         })}
-    </div>
+    </>
   );
-}
+});
