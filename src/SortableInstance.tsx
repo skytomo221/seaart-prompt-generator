@@ -2,6 +2,7 @@ import { Button, MenuItem } from "@blueprintjs/core";
 import { Suggest, type ItemRenderer } from "@blueprintjs/select";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useState } from "react";
 import { ConceptInstance, Data, VariantGroup } from "./data";
 import PresetSelect from "./PresetSelect";
 
@@ -70,6 +71,7 @@ export default function SortableInstance({
   onPresetChange: (id?: string) => void;
   onVariantChange: (groupId: string, variantId?: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const {
     attributes,
     listeners,
@@ -84,6 +86,7 @@ export default function SortableInstance({
   const concept = instance.conceptId
     ? data.concepts.find((item) => item.id === instance.conceptId)
     : undefined;
+  const hasVariants = (concept?.variantGroups.length ?? 0) > 0;
 
   return (
     <div
@@ -119,34 +122,50 @@ export default function SortableInstance({
           <PresetSelect
             presetId={instance.presetId}
             data={data}
-            onChange={onPresetChange}
+            onChange={(id) => {
+              setExpanded(false);
+              onPresetChange(id);
+            }}
           />
         </div>
+        {hasVariants && (
+          <Button
+            icon={expanded ? "chevron-up" : "chevron-down"}
+            variant="minimal"
+            size="small"
+            aria-label={expanded ? "Variant詳細を閉じる" : "Variant詳細を開く"}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
+            style={{ flex: "0 0 auto" }}
+          />
+        )}
       </div>
-      {concept?.variantGroups.map((group) => {
-        const selectedId = instance.variantSelections.find(
-          (selection) => selection.groupId === group.id,
-        )?.variantId;
-        return (
-          <div
-            key={group.id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              paddingLeft: 34,
-              width: "100%",
-            }}
-          >
-            <span style={{ flex: "0 0 auto" }}>{group.name}：</span>
-            <VariantSelect
-              group={group}
-              selectedId={selectedId}
-              onChange={(variantId) => onVariantChange(group.id, variantId)}
-            />
-          </div>
-        );
-      })}
+      {hasVariants &&
+        expanded &&
+        concept?.variantGroups.map((group) => {
+          const selectedId = instance.variantSelections.find(
+            (selection) => selection.groupId === group.id,
+          )?.variantId;
+          return (
+            <div
+              key={group.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                paddingLeft: 34,
+                width: "100%",
+              }}
+            >
+              <span style={{ flex: "0 0 auto" }}>{group.name}：</span>
+              <VariantSelect
+                group={group}
+                selectedId={selectedId}
+                onChange={(variantId) => onVariantChange(group.id, variantId)}
+              />
+            </div>
+          );
+        })}
     </div>
   );
 }
