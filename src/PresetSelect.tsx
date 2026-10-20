@@ -1,5 +1,6 @@
 import { MenuItem } from "@blueprintjs/core";
 import { Suggest, type ItemRenderer } from "@blueprintjs/select";
+import type { ClipboardEvent } from "react";
 import { Id } from "./data";
 import { PresetOption } from "./domain/dataIndex";
 
@@ -13,6 +14,20 @@ export default function PresetSelect({
   onChange: (id?: string) => void;
 }) {
   const chosen = options.find((x) => x.id === presetId && x.id !== "__blank");
+  const handleCopy = (event: ClipboardEvent<HTMLInputElement>) => {
+    const { selectionStart, selectionEnd } = event.currentTarget;
+    if (
+      selectionStart !== null &&
+      selectionEnd !== null &&
+      selectionStart !== selectionEnd
+    ) {
+      return;
+    }
+    if (!chosen) return;
+
+    event.preventDefault();
+    event.clipboardData.setData("text/plain", chosen.label);
+  };
   type Item = PresetOption;
   const blank = options[0];
   const items = options;
@@ -58,6 +73,7 @@ export default function PresetSelect({
       }
       resetOnClose
       inputProps={{
+        onCopy: handleCopy,
         style: {
           color: chosen?.color,
           backgroundColor: chosen?.backgroundColor,
