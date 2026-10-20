@@ -5,7 +5,22 @@ import {
   InputGroup,
   TextArea,
 } from "@blueprintjs/core";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  closestCenter,
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   Attribute,
   Category,
@@ -29,6 +44,64 @@ interface Props {
   label: string;
   negative?: boolean;
   readOnly?: boolean;
+}
+
+export function reorderDefinitions(
+  value: PromptFragmentSet,
+  activeId: string,
+  overId: string,
+): PromptFragmentSet {
+  if (activeId === overId) return value;
+  const from = value.definitions.findIndex((item) => item.id === activeId);
+  const to = value.definitions.findIndex((item) => item.id === overId);
+  if (from < 0 || to < 0) return value;
+  return { ...value, definitions: arrayMove(value.definitions, from, to) };
+}
+
+function SortableNamedFragmentCard({
+  id,
+  children,
+}: {
+  id: Id;
+  children(handle: ReactNode): ReactNode;
+}) {
+  const {
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+    attributes,
+    listeners,
+  } = useSortable({ id });
+  return (
+    <Card
+      compact
+      className="named-fragment-card"
+      ref={setNodeRef}
+      style={{
+        // Keep each card at its original size when hovering over taller/shorter cards.
+        transform: CSS.Translate.toString(transform),
+        position: "relative",
+        zIndex: isDragging ? 1 : undefined,
+        transition,
+        opacity: isDragging ? 0.3 : 1,
+      }}
+    >
+      {children(
+        <Button
+          ref={setActivatorNodeRef}
+          {...attributes}
+          {...listeners}
+          icon="drag-handle-vertical"
+          variant="minimal"
+          size="small"
+          aria-label="ドラッグして並べ替え"
+          style={{ flex: "0 0 auto", cursor: "grab", touchAction: "none" }}
+        />,
+      )}
+    </Card>
+  );
 }
 
 export function formatFragmentSequence(
@@ -75,7 +148,9 @@ export function parseFragmentSequence(
   return { fragments };
 }
 
-function definitionFragments(definition: NamedPromptFragment): PromptFragment[] {
+function definitionFragments(
+  definition: NamedPromptFragment,
+): PromptFragment[] {
   if ("selfVariantGroup" in definition.if)
     return definition.if.selfVariantGroup.cases.flatMap(
       (item) => item.fragments,
@@ -124,7 +199,8 @@ function referencesDefinition(set: PromptFragmentSet, id: Id): boolean {
   return (
     has(set.root) ||
     set.definitions.some(
-      (definition) => definition.id !== id && has(definitionFragments(definition)),
+      (definition) =>
+        definition.id !== id && has(definitionFragments(definition)),
     )
   );
 }
@@ -336,6 +412,14 @@ export default function PromptFragmentEditor({
   readOnly = false,
 }: Props) {
   const [error, setError] = useState("");
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+  );
+  const reorder = ({ active, over }: DragEndEvent) => {
+    if (!over) return;
+    const next = reorderDefinitions(value, String(active.id), String(over.id));
+    if (next !== value) onChange(next);
+  };
   const initialCondition = createInitialCondition(
     concepts,
     categories,
@@ -343,7 +427,8 @@ export default function PromptFragmentEditor({
   );
   const ownerConcept = concepts.find(
     (concept) =>
-      concept.promptFragments === value || concept.negativePromptFragments === value,
+      concept.promptFragments === value ||
+      concept.negativePromptFragments === value,
   );
   const namedLabel = negative
     ? "名前付きネガティブフラグメント"
@@ -550,91 +635,110 @@ export default function PromptFragmentEditor({
           </FormGroup>
           <div className="named-fragment-list">
             <h4>{namedLabel}</h4>
-            {value.definitions.map((definition) => {
-              const duplicateName = value.definitions.some(
-                (other) =>
-                  other.id !== definition.id && other.name === definition.name,
-              );
-              const referenced = referencesDefinition(value, definition.id);
-              return (
-                <Card
-                  compact
-                  className="named-fragment-card"
-                  key={definition.id}
-                >
-                  <div className="named-fragment-name-row">
-                    <span>名前：#[</span>
-                    <InputGroup
-                      value={definition.name}
-                      onChange={(event) =>
-                        patchDefinition(definition.id, {
-                          name: event.currentTarget.value,
-                        })
-                      }
-                    />
-                    <span>]</span>
-                    <Button
-                      small
-                      icon="trash"
-                      intent="danger"
-                      variant="minimal"
-                      disabled={referenced}
-                      aria-label={`${namedLabel}を削除`}
-                      onClick={() =>
-                        onChange({
-                          ...value,
-                          definitions: value.definitions.filter(
-                            (item) => item.id !== definition.id,
-                          ),
-                        })
-                      }
-                    />
-                  </div>
-                  {duplicateName && (
-                    <small className="condition-validation">
-                      同じ名前の{namedLabel}
-                      があります。名前はこの欄の中で一意にしてください。
-                    </small>
-                  )}
-                  {referenced && (
-                    <small className="fragment-reference-note">
-                      他のフラグメントから参照されています。
-                    </small>
-                  )}
-                  <div className="named-fragment-field">
-                    <b>条件：</b>
-                    <ConditionEditor
-                      value={definition.if}
-                      onChange={(condition) =>
-                        patchDefinition(definition.id, {
-                          if: condition,
-                          ...("selfVariantGroup" in condition
-                            ? { fragments: [] }
-                            : {}),
-                        })
-                      }
-                      selfConcept={ownerConcept}
-                      {...{ concepts, categories, attributes }}
-                    />
-                  </div>
-                  {"selfVariantGroup" in definition.if ? (
-                    renderVariantCases(definition, true)
-                  ) : (
-                    <div className="named-fragment-field">
-                      <b>挿入フラグメント：</b>
-                      <SequenceEditor
-                        sequence={definition.fragments}
-                        set={value}
-                        ariaLabel={`${definition.name}の挿入フラグメント`}
-                        onChange={(fragments) =>
-                          updateDefinitionFragments(definition.id, fragments)
-                        }
-                      />
-                    </div>
-                  )}
-                </Card>
-              );
-            })}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={reorder}
+            >
+              <SortableContext
+                items={value.definitions.map((item) => item.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {value.definitions.map((definition) => {
+                  const duplicateName = value.definitions.some(
+                    (other) =>
+                      other.id !== definition.id &&
+                      other.name === definition.name,
+                  );
+                  const referenced = referencesDefinition(value, definition.id);
+                  return (
+                    <SortableNamedFragmentCard
+                      id={definition.id}
+                      key={definition.id}
+                    >
+                      {(handle) => (
+                        <>
+                          <div className="named-fragment-name-row">
+                            {handle}
+                            <span>名前：#[</span>
+                            <InputGroup
+                              value={definition.name}
+                              onChange={(event) =>
+                                patchDefinition(definition.id, {
+                                  name: event.currentTarget.value,
+                                })
+                              }
+                            />
+                            <span>]</span>
+                            <Button
+                              small
+                              icon="trash"
+                              intent="danger"
+                              variant="minimal"
+                              disabled={referenced}
+                              aria-label={`${namedLabel}を削除`}
+                              onClick={() =>
+                                onChange({
+                                  ...value,
+                                  definitions: value.definitions.filter(
+                                    (item) => item.id !== definition.id,
+                                  ),
+                                })
+                              }
+                            />
+                          </div>
+                          {duplicateName && (
+                            <small className="condition-validation">
+                              同じ名前の{namedLabel}
+                              があります。名前はこの欄の中で一意にしてください。
+                            </small>
+                          )}
+                          {referenced && (
+                            <small className="fragment-reference-note">
+                              他のフラグメントから参照されています。
+                            </small>
+                          )}
+                          <div className="named-fragment-field">
+                            <b>条件：</b>
+                            <ConditionEditor
+                              value={definition.if}
+                              onChange={(condition) =>
+                                patchDefinition(definition.id, {
+                                  if: condition,
+                                  ...("selfVariantGroup" in condition
+                                    ? { fragments: [] }
+                                    : {}),
+                                })
+                              }
+                              selfConcept={ownerConcept}
+                              {...{ concepts, categories, attributes }}
+                            />
+                          </div>
+                          {"selfVariantGroup" in definition.if ? (
+                            renderVariantCases(definition, true)
+                          ) : (
+                            <div className="named-fragment-field">
+                              <b>挿入フラグメント：</b>
+                              <SequenceEditor
+                                sequence={definition.fragments}
+                                set={value}
+                                ariaLabel={`${definition.name}の挿入フラグメント`}
+                                onChange={(fragments) =>
+                                  updateDefinitionFragments(
+                                    definition.id,
+                                    fragments,
+                                  )
+                                }
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </SortableNamedFragmentCard>
+                  );
+                })}
+              </SortableContext>
+            </DndContext>
             <Button
               small
               icon="add"
