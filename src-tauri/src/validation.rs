@@ -243,7 +243,10 @@ fn validate_selections(
     let mut used_groups = HashSet::<String>::new();
     for selection in selections {
         if !used_groups.insert(selection.group_id.clone()) {
-            errors.push(format!("{owner} repeats VariantGroup {}", selection.group_id));
+            errors.push(format!(
+                "{owner} repeats VariantGroup {}",
+                selection.group_id
+            ));
         }
         let Some(group) = concept
             .variant_groups
@@ -333,12 +336,7 @@ fn validate_fragment_set(
                             variant_case.variant_id
                         ));
                     }
-                    validate_sequence(
-                        &variant_case.fragments,
-                        &definition_ids,
-                        label,
-                        errors,
-                    );
+                    validate_sequence(&variant_case.fragments, &definition_ids, label, errors);
                 }
             }
             condition => {
@@ -381,22 +379,14 @@ fn validate_fragment_set(
                     .cases
                     .iter()
                     .flat_map(|variant_case| variant_case.fragments.iter())
-                    .filter_map(|fragment| match fragment {
-                        PromptFragment::Reference(reference) => {
-                            Some(reference.fragment_id.as_str())
-                        }
-                        PromptFragment::Tag(_) => None,
-                    })
+                    .flat_map(PromptFragment::references)
+                    .map(|reference| reference.fragment_id.as_str())
                     .any(|next| visit(next, by_id, visiting, done)),
                 _ => definition
                     .fragments
                     .iter()
-                    .filter_map(|fragment| match fragment {
-                        PromptFragment::Reference(reference) => {
-                            Some(reference.fragment_id.as_str())
-                        }
-                        PromptFragment::Tag(_) => None,
-                    })
+                    .flat_map(PromptFragment::references)
+                    .map(|reference| reference.fragment_id.as_str())
                     .any(|next| visit(next, by_id, visiting, done)),
             }
         } else {
@@ -422,19 +412,18 @@ fn validate_sequence(
     errors: &mut Vec<String>,
 ) {
     for fragment in fragments {
-        match fragment {
-            PromptFragment::Tag(tag) if tag.trim().is_empty() => {
-                errors.push(format!("{label}: whitespace-only Tag"))
+        if let PromptFragment::Tag(tag) = fragment {
+            if tag.trim().is_empty() {
+                errors.push(format!("{label}: whitespace-only Tag"));
             }
-            PromptFragment::Reference(reference)
-                if !definition_ids.contains(&reference.fragment_id) =>
-            {
+        }
+        for reference in fragment.references() {
+            if !definition_ids.contains(&reference.fragment_id) {
                 errors.push(format!(
                     "{label}: missing named fragment {}",
                     reference.fragment_id
-                ))
+                ));
             }
-            _ => {}
         }
     }
 }
@@ -575,6 +564,31 @@ mod tests {
     }
 
     #[test]
+    fn validates_inline_references_and_cycles_in_both_prompt_sets() {
+        for key in ["promptFragments", "negativePromptFragments"] {
+            let (mut data, generators) = valid();
+            data["concepts"][0][key] = json!({
+                "root":[{"parts":[{"fragmentId":"a"}, " panties"]}],
+                "definitions":[
+                    {"id":"a","name":"A","if":{"category":{"categoryId":"cat","operator":"is","existence":"notExists"}},"fragments":["white"]},
+                    {"id":"b","name":"B","if":{"category":{"categoryId":"cat","operator":"is","existence":"notExists"}},"fragments":[{"parts":["x ",{"fragmentId":"a"}]}]}
+                ]
+            });
+            assert!(validate_pair(&data, &generators).is_ok());
+            data["concepts"][0][key]["root"][0]["parts"][0]["fragmentId"] = json!("missing");
+            assert!(validate_pair(&data, &generators)
+                .unwrap_err()
+                .contains("missing named fragment missing"));
+            data["concepts"][0][key]["root"][0]["parts"][0]["fragmentId"] = json!("a");
+            data["concepts"][0][key]["definitions"][0]["fragments"] =
+                json!([{"parts":[{"fragmentId":"b"}, " y"]}]);
+            assert!(validate_pair(&data, &generators)
+                .unwrap_err()
+                .contains("named fragment reference cycle"));
+        }
+    }
+
+    #[test]
     fn rejects_missing_instance_preset() {
         let (data, mut generators) = valid();
         generators["promptGenerators"] = json!([{"id":"g","instances":[{"id":"i","conceptId":"con","presetId":"missing","variantSelections":[]}]}]);
@@ -587,7 +601,8 @@ mod tests {
     fn accepts_independent_instance_variant() {
         let (mut data, mut generators) = valid();
         data["concepts"][0]["variantGroups"] = json!([{"id":"uniform","name":"制服","variants":[{"id":"summer","name":"夏服","attributeIds":[]},{"id":"winter","name":"冬服","attributeIds":[]}]}]);
-        data["concepts"][0]["presets"][0]["variantSelections"] = json!([{"groupId":"uniform","variantId":"summer"}]);
+        data["concepts"][0]["presets"][0]["variantSelections"] =
+            json!([{"groupId":"uniform","variantId":"summer"}]);
         generators["promptGenerators"] = json!([{"id":"g","instances":[{"id":"i","conceptId":"con","presetId":"pre","variantSelections":[{"groupId":"uniform","variantId":"winter"}]}]}]);
         assert!(validate_pair(&data, &generators).is_ok());
     }

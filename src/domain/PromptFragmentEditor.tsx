@@ -27,10 +27,12 @@ import {
   Condition,
   Concept,
   Id,
+  FragmentReference,
   NamedPromptFragment,
   PromptFragment,
   PromptFragmentSet,
 } from "../data";
+import { fragmentReferences } from "./fragmentReferences";
 import ConditionEditor from "./ConditionEditor";
 import "./namedFragments.css";
 import { createInitialCondition } from "./conditionDefaults";
@@ -111,6 +113,14 @@ export function formatFragmentSequence(
   return fragments
     .map((fragment) => {
       if (typeof fragment === "string") return fragment;
+      if ("parts" in fragment)
+        return fragment.parts
+          .map((part) =>
+            typeof part === "string"
+              ? part
+              : formatFragmentSequence([part], set),
+          )
+          .join("");
       const definition = set.definitions.find(
         (candidate) => candidate.id === fragment.fragmentId,
       );
@@ -129,21 +139,29 @@ export function parseFragmentSequence(
   for (const raw of text.split(",")) {
     const token = raw.trim();
     if (!token) continue;
-    const match = token.match(/^#\[(.+)]$/);
-    if (!match) {
-      fragments.push(token);
-      continue;
+    const parts: Array<string | FragmentReference> = [];
+    let offset = 0;
+    for (const match of token.matchAll(/#\[([^\]]+)]/g)) {
+      if (match.index > offset) parts.push(token.slice(offset, match.index));
+      const matches = set.definitions.filter(
+        (definition) => definition.name === match[1],
+      );
+      if (!matches.length)
+        return {
+          error: `名前付きフラグメント「${match[1]}」が見つかりません。`,
+        };
+      if (matches.length > 1)
+        return {
+          error: `名前付きフラグメント名「${match[1]}」が重複しています。`,
+        };
+      parts.push({ fragmentId: matches[0].id });
+      offset = match.index + match[0].length;
     }
-    const matches = set.definitions.filter(
-      (definition) => definition.name === match[1],
-    );
-    if (!matches.length)
-      return { error: `名前付きフラグメント「${match[1]}」が見つかりません。` };
-    if (matches.length > 1)
-      return {
-        error: `名前付きフラグメント名「${match[1]}」が重複しています。`,
-      };
-    fragments.push({ fragmentId: matches[0].id });
+    if (!parts.length) fragments.push(token);
+    else {
+      if (offset < token.length) parts.push(token.slice(offset));
+      fragments.push(parts.length === 1 ? parts[0] : { parts });
+    }
   }
   return { fragments };
 }
@@ -175,9 +193,10 @@ export function findFragmentCycle(set: PromptFragmentSet): Id[] | undefined {
     path.push(id);
     const definition = definitions.get(id);
     for (const fragment of definition ? definitionFragments(definition) : []) {
-      if (typeof fragment === "string") continue;
-      const cycle = visit(fragment.fragmentId);
-      if (cycle) return cycle;
+      for (const reference of fragmentReferences(fragment)) {
+        const cycle = visit(reference.fragmentId);
+        if (cycle) return cycle;
+      }
     }
     path.pop();
     visiting.delete(id);
@@ -191,10 +210,12 @@ export function findFragmentCycle(set: PromptFragmentSet): Id[] | undefined {
   return undefined;
 }
 
-function referencesDefinition(set: PromptFragmentSet, id: Id): boolean {
+export function referencesDefinition(set: PromptFragmentSet, id: Id): boolean {
   const has = (fragments: PromptFragment[]) =>
-    fragments.some(
-      (fragment) => typeof fragment !== "string" && fragment.fragmentId === id,
+    fragments.some((fragment) =>
+      fragmentReferences(fragment).some(
+        (reference) => reference.fragmentId === id,
+      ),
     );
   return (
     has(set.root) ||

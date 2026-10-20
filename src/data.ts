@@ -36,7 +36,10 @@ export interface Preset {
 export interface FragmentReference {
   fragmentId: Id;
 }
-export type PromptFragment = Tag | FragmentReference;
+export interface FragmentTemplate {
+  parts: Array<string | FragmentReference>;
+}
+export type PromptFragment = Tag | FragmentReference | FragmentTemplate;
 export interface PromptFragmentSet {
   root: PromptFragment[];
   definitions: NamedPromptFragment[];

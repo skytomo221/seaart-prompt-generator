@@ -1,7 +1,5 @@
-import {
-  Data,
-  PromptGeneratorsData,
-} from "../data";
+import { fragmentReferences, isFragmentReference } from "./fragmentReferences";
+import { Data, PromptGeneratorsData } from "../data";
 import { allPresets } from "./presets";
 
 export function validateData(
@@ -291,18 +289,25 @@ export function validateData(
           if (!fragment.trim()) errors.push(`${path}: whitespace-only tag`);
           continue;
         }
-        if (
-          !fragment ||
-          typeof fragment !== "object" ||
-          Array.isArray(fragment) ||
-          Object.keys(fragment).length !== 1 ||
-          typeof fragment.fragmentId !== "string"
-        ) {
+        const validTemplate =
+          fragment &&
+          typeof fragment === "object" &&
+          !Array.isArray(fragment) &&
+          Object.keys(fragment).length === 1 &&
+          Array.isArray(fragment.parts) &&
+          fragment.parts.every(
+            (part: unknown) =>
+              typeof part === "string" || isFragmentReference(part),
+          );
+        if (!isFragmentReference(fragment) && !validTemplate) {
           errors.push(`${path}: invalid fragment reference`);
           continue;
         }
-        if (!definitionIds.has(fragment.fragmentId))
-          errors.push(`${path}: missing named fragment ${fragment.fragmentId}`);
+        for (const reference of fragmentReferences(fragment))
+          if (!definitionIds.has(reference.fragmentId))
+            errors.push(
+              `${path}: missing named fragment ${reference.fragmentId}`,
+            );
       }
     };
     checkSequence(set.root, `${owner} root`);
@@ -377,8 +382,8 @@ export function validateData(
             )
           : (definition?.fragments ?? []);
       for (const fragment of fragments)
-        if (typeof fragment !== "string" && visit(fragment.fragmentId))
-          return true;
+        for (const reference of fragmentReferences(fragment))
+          if (visit(reference.fragmentId)) return true;
       cycleVisiting.delete(id);
       cycleDone.add(id);
       return false;
@@ -414,12 +419,17 @@ export function validateData(
     for (const generator of generators.promptGenerators ?? []) {
       addId(generator, "prompt generator");
       if (!Array.isArray(generator.instances)) {
-        errors.push(`PromptGenerator ${generator.id}: instances must be an array`);
+        errors.push(
+          `PromptGenerator ${generator.id}: instances must be an array`,
+        );
         continue;
       }
       for (const instance of generator.instances) {
         addId(instance, "concept instance");
-        if (instance.conceptId === undefined && instance.presetId === undefined) {
+        if (
+          instance.conceptId === undefined &&
+          instance.presetId === undefined
+        ) {
           checkSelections(
             `Instance ${instance.id}`,
             { variantGroups: [] },
@@ -445,9 +455,7 @@ export function validateData(
           );
           continue;
         }
-        const concept = concepts.find(
-          (item) => item.id === instance.conceptId,
-        );
+        const concept = concepts.find((item) => item.id === instance.conceptId);
         if (
           !concept?.presets.some(
             (preset: any) => preset.id === instance.presetId,
