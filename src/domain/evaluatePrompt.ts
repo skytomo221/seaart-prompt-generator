@@ -167,6 +167,27 @@ export function evaluateFragments(
       output.push(fragment);
       continue;
     }
+    if ("parts" in fragment) {
+      output.push(
+        fragment.parts
+          .map((part) =>
+            typeof part === "string"
+              ? part
+              : evaluateFragments(
+                  [part],
+                  set,
+                  self,
+                  environment,
+                  data,
+                  resolving,
+                  evaluation,
+                  definitions,
+                ).join(","),
+          )
+          .join(""),
+      );
+      continue;
+    }
     const definition = definitions.get(fragment.fragmentId);
     if (!definition || resolving.has(definition.id)) continue;
 

@@ -102,6 +102,37 @@ pub struct FragmentReference {
 pub enum PromptFragment {
     Tag(Tag),
     Reference(FragmentReference),
+    Template(FragmentTemplate),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FragmentTemplate {
+    pub parts: Vec<FragmentTemplatePart>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum FragmentTemplatePart {
+    Text(String),
+    Reference(FragmentReference),
+}
+
+impl PromptFragment {
+    pub fn references(&self) -> Vec<&FragmentReference> {
+        match self {
+            Self::Tag(_) => vec![],
+            Self::Reference(reference) => vec![reference],
+            Self::Template(template) => template
+                .parts
+                .iter()
+                .filter_map(|part| match part {
+                    FragmentTemplatePart::Text(_) => None,
+                    FragmentTemplatePart::Reference(reference) => Some(reference),
+                })
+                .collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -230,6 +261,16 @@ pub struct PromptGeneratorsData {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn serde_round_trips_inline_and_legacy_fragments() {
+        let input = json!(["legacy", {"fragmentId":"f"},
+            {"parts":["cute ", {"fragmentId":"f"}, " ", {"fragmentId":"g"}, " panties"]}]);
+        let fragments: Vec<PromptFragment> = serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&fragments).unwrap(), input);
+        assert_eq!(fragments[2].references().len(), 2);
+        assert!(serde_json::from_value::<PromptFragment>(json!({"parts":[{"parts":[]}]})).is_err());
+    }
+
     #[test]
     fn serde_uses_named_fragment_and_explicit_existence() {
         let v: PromptFragmentSet = serde_json::from_value(json!({

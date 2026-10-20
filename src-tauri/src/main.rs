@@ -50,3 +50,25 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn save_payload_accepts_inline_templates() {
+        let input = json!({
+            "data": {"schemaVersion":2,"attributes":[],"categories":[],"concepts":[{
+                "id":"c","name":"C","categoryId":"","attributeIds":[],"variantGroups":[],"presets":[],
+                "promptFragments":{"root":[{"parts":[{"fragmentId":"f"}," panties"]}],"definitions":[
+                    {"id":"f","name":"Color","if":{"all":[]},"fragments":["white"]}
+                ]},
+                "negativePromptFragments":{"root":[],"definitions":[]}
+            }]},
+            "promptGenerators":{"schemaVersion":2,"promptGenerators":[]}
+        });
+        let payload: SavePayload = serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(serde_json::to_value(payload.data).unwrap(), input["data"]);
+    }
+}
