@@ -1,5 +1,5 @@
-import { Button } from "@blueprintjs/core";
-import type { CSSProperties, MutableRefObject } from "react";
+import { Button, ContextMenu, mergeRefs } from "@blueprintjs/core";
+import type { CSSProperties, MutableRefObject, ReactElement } from "react";
 import { useLayoutEffect, useRef } from "react";
 import {
   DndContext,
@@ -24,18 +24,25 @@ function Row({
   selected,
   onSelect,
   itemStyle,
+  contextMenu,
 }: {
   id: string;
   name: string;
   selected: boolean;
   onSelect: () => void;
   itemStyle?: CSSProperties;
+  contextMenu?: ReactElement;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id });
-  return (
+  const renderRow = (
+    onContextMenu?: React.MouseEventHandler<HTMLElement>,
+    contextRef?: React.Ref<HTMLDivElement>,
+    popover?: ReactElement,
+  ) => (
     <div
-      ref={setNodeRef}
+      onContextMenu={onContextMenu}
+      ref={mergeRefs(setNodeRef, contextRef)}
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
@@ -46,6 +53,7 @@ function Row({
       }}
       className={`editor-list-row${selected ? " is-selected" : ""}`}
     >
+      {popover}
       <Button
         {...attributes}
         {...listeners}
@@ -65,6 +73,15 @@ function Row({
       </button>
     </div>
   );
+  return contextMenu ? (
+    <ContextMenu content={contextMenu}>
+      {({ onContextMenu, ref, popover }) =>
+        renderRow(onContextMenu, ref, popover)
+      }
+    </ContextMenu>
+  ) : (
+    renderRow()
+  );
 }
 
 export default function EntityListPane({
@@ -75,6 +92,7 @@ export default function EntityListPane({
   onReorder,
   scrollTopRef,
   itemStyles,
+  renderContextMenu,
 }: {
   items: { id: string; name: string }[];
   selectedId: string;
@@ -83,6 +101,10 @@ export default function EntityListPane({
   onReorder: (items: { id: string; name: string }[]) => void;
   scrollTopRef: MutableRefObject<number>;
   itemStyles?: Record<string, CSSProperties | undefined>;
+  renderContextMenu?: (item: {
+    id: string;
+    name: string;
+  }) => ReactElement | undefined;
 }) {
   const sensors = useSensors(useSensor(PointerSensor));
   const listRef = useRef<HTMLElement>(null);
@@ -117,6 +139,7 @@ export default function EntityListPane({
               <div key={x.id}>
                 <Row
                   {...x}
+                  contextMenu={renderContextMenu?.(x)}
                   selected={selectedId === x.id}
                   onSelect={() => onSelect(x.id)}
                   itemStyle={itemStyles?.[x.id]}
