@@ -6,12 +6,7 @@ import {
 } from "../data";
 
 type Kind =
-  | "concept"
-  | "category"
-  | "attribute"
-  | "preset"
-  | "variantGroup"
-  | "variant";
+  "concept" | "category" | "attribute" | "preset" | "variantGroup" | "variant";
 
 function conditionHas(
   condition: Condition,
@@ -71,7 +66,9 @@ function dataHasCondition(data: Data, field: string, id: string): boolean {
 }
 
 function generatorInstances(generators: PromptGeneratorsData) {
-  return generators.promptGenerators.flatMap((generator) => generator.instances);
+  return generators.promptGenerators.flatMap(
+    (generator) => generator.instances,
+  );
 }
 
 export function getDeletionReferences(
@@ -113,7 +110,9 @@ export function getDeletionReferences(
           refs.push(`プリセット「${preset.name}」`);
     if (
       instances.some((instance) =>
-        instance.variantSelections.some((selection) => selection.groupId === id),
+        instance.variantSelections.some(
+          (selection) => selection.groupId === id,
+        ),
       )
     )
       refs.push("プロンプト生成フォームのインスタンス");
@@ -150,12 +149,13 @@ export function getDeletionReferences(
   if (kind === "attribute") {
     data.attributes
       .filter((attribute) => attribute.implies.includes(id))
-      .forEach((attribute) => refs.push(`含意する属性「${attribute.name}」`));
+      .forEach((attribute) => refs.push(`子属性「${attribute.name}」`));
     data.categories
       .filter((category) => category.attributeIds.includes(id))
       .forEach((category) => refs.push(`カテゴリ「${category.name}」`));
     data.concepts.forEach((item) => {
-      if (item.attributeIds.includes(id)) refs.push(`コンセプト「${item.name}」`);
+      if (item.attributeIds.includes(id))
+        refs.push(`コンセプト「${item.name}」`);
       if (
         item.variantGroups.some((group) =>
           group.variants.some((variant) => variant.attributeIds.includes(id)),

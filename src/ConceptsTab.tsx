@@ -1,6 +1,8 @@
+import { Menu, MenuItem, MenuDivider } from "@blueprintjs/core";
 import type { MutableRefObject } from "react";
 import { v4 as uuid } from "uuid";
 import { Concept, Data, PromptGeneratorsData } from "./data";
+import { cloneConcept } from "./domain/cloneConcept";
 import ConceptList from "./ConceptList";
 import ConceptEditor from "./ConceptEditor";
 import { getDeletionReferences } from "./domain/references";
@@ -45,6 +47,21 @@ export default function ConceptsTab({
     });
     onSelect(concept.id);
   };
+  const duplicate = (id: string, position: "above" | "below") => {
+    const index = data.concepts.findIndex((item) => item.id === id);
+    if (index < 0) return;
+    const copy = cloneConcept(data.concepts[index]);
+    const at = index + (position === "below" ? 1 : 0);
+    onChange({
+      ...data,
+      concepts: [
+        ...data.concepts.slice(0, at),
+        copy,
+        ...data.concepts.slice(at),
+      ],
+    });
+    onSelect(copy.id);
+  };
   const update = (concept: Concept) => {
     const current = data.concepts.find((item) => item.id === concept.id);
     const updated =
@@ -68,7 +85,9 @@ export default function ConceptsTab({
     kind: "concept" | "preset" | "variantGroup" | "variant",
     id: string,
   ) => {
-    const concept = data.concepts.find((item) => item.id === selectedId);
+    const concept = data.concepts.find(
+      (item) => item.id === (kind === "concept" ? id : selectedId),
+    );
     const refs = getDeletionReferences(kind, id, data, generators, concept);
     if (refs.length) {
       onError(`削除できません。参照元:\n${refs.join("\n")}`);
@@ -80,7 +99,7 @@ export default function ConceptsTab({
         ...data,
         concepts: data.concepts.filter((item) => item.id !== id),
       });
-      onSelect("");
+      if (selectedId === id) onSelect("");
     } else if (kind === "preset")
       onChange({
         ...data,
@@ -127,6 +146,24 @@ export default function ConceptsTab({
     <div className="tab-content editor-tab-content">
       <ConceptList
         items={data.concepts}
+        renderContextMenu={(item) => (
+          <Menu>
+            <MenuItem
+              text="上に複製する"
+              onClick={() => duplicate(item.id, "above")}
+            />
+            <MenuItem
+              text="下に複製する"
+              onClick={() => duplicate(item.id, "below")}
+            />
+            <MenuDivider />
+            <MenuItem
+              text="削除する"
+              intent="danger"
+              onClick={() => remove("concept", item.id)}
+            />
+          </Menu>
+        )}
         selectedId={selectedId}
         onSelect={onSelect}
         onAdd={add}
