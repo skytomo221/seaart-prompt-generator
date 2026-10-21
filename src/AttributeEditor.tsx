@@ -1,17 +1,23 @@
 import { FormGroup, InputGroup } from "@blueprintjs/core";
 import { Attribute, Data } from "./data";
 import AttributeMultiSelect from "./AttributeMultiSelect";
+import {
+  canAddAttributeParent,
+  getAttributeChildren,
+  setAttributeParents,
+  setAttributeChildren,
+} from "./domain/attributeRelations";
 import EntityEditorLayout from "./EntityEditorLayout";
 
 export default function AttributeEditor({
   attribute,
   data,
-  onChange,
+  onDataChange,
   onDelete,
 }: {
   attribute: Attribute;
   data: Data;
-  onChange: (a: Attribute) => void;
+  onDataChange: (data: Data) => void;
   onDelete: () => void;
 }) {
   const concepts = data.concepts.filter((concept) =>
@@ -27,9 +33,7 @@ export default function AttributeEditor({
         .map((variant) => `${concept.name} / ${group.name} / ${variant.name}`),
     ),
   );
-  const impliedBy = data.attributes.filter((candidate) =>
-    candidate.implies.includes(attribute.id),
-  );
+  const children = getAttributeChildren(data.attributes, attribute.id);
   const attributeNames = (ids: string[]) =>
     ids
       .map((id) => data.attributes.find((item) => item.id === id)?.name ?? id)
@@ -73,18 +77,6 @@ export default function AttributeEditor({
           <p>該当するバリアントはありません。</p>
         )}
       </section>
-      <section className="reference-section">
-        <h3>この属性を含意する属性</h3>
-        {impliedBy.length ? (
-          <ul>
-            {impliedBy.map((item) => (
-              <li key={item.id}>{item.name}</li>
-            ))}
-          </ul>
-        ) : (
-          <p>この属性を含意する属性はありません。</p>
-        )}
-      </section>
     </>
   );
 
@@ -100,8 +92,12 @@ export default function AttributeEditor({
             <div>{attribute.name || "未設定"}</div>
           </div>
           <div className="detail-view-field">
-            <div className="detail-view-label">含意する属性</div>
+            <div className="detail-view-label">親属性</div>
             <div>{attributeNames(attribute.implies)}</div>
+          </div>
+          <div className="detail-view-field">
+            <div className="detail-view-label">子属性</div>
+            <div>{attributeNames(children.map((child) => child.id))}</div>
           </div>
           {references}
         </>
@@ -112,16 +108,51 @@ export default function AttributeEditor({
             <InputGroup
               value={attribute.name}
               onChange={(e) =>
-                onChange({ ...attribute, name: e.currentTarget.value })
+                onDataChange({
+                  ...data,
+                  attributes: data.attributes.map((item) =>
+                    item.id === attribute.id
+                      ? { ...item, name: e.currentTarget.value }
+                      : item,
+                  ),
+                })
               }
             />
           </FormGroup>
-          <FormGroup label="含意する属性">
+          <FormGroup label="親属性">
             <AttributeMultiSelect
-              attributes={data.attributes}
+              attributes={data.attributes.filter(
+                (candidate) =>
+                  attribute.implies.includes(candidate.id) ||
+                  canAddAttributeParent(
+                    data.attributes,
+                    attribute.id,
+                    candidate.id,
+                  ),
+              )}
               selectedIds={attribute.implies}
               excludeId={attribute.id}
-              onChange={(implies) => onChange({ ...attribute, implies })}
+              onChange={(ids) =>
+                onDataChange(setAttributeParents(data, attribute.id, ids))
+              }
+            />
+          </FormGroup>
+          <FormGroup label="子属性">
+            <AttributeMultiSelect
+              attributes={data.attributes.filter(
+                (candidate) =>
+                  children.some((child) => child.id === candidate.id) ||
+                  canAddAttributeParent(
+                    data.attributes,
+                    candidate.id,
+                    attribute.id,
+                  ),
+              )}
+              selectedIds={children.map((child) => child.id)}
+              excludeId={attribute.id}
+              onChange={(ids) =>
+                onDataChange(setAttributeChildren(data, attribute.id, ids))
+              }
             />
           </FormGroup>
           {references}

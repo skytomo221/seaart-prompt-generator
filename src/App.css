@@ -507,3 +507,30 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.attributes-tab > .bp6-button-group {
+  margin-bottom: 8px;
+}
+.attributes-tab .editor-tab-content {
+  height: calc(100vh - 100px);
+}
+.attribute-graph-view {
+  grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr);
+}
+.attribute-graph {
+  min-width: 0;
+  min-height: 300px;
+  height: 100%;
+  border: 1px solid rgba(16, 22, 26, 0.15);
+}
+.attribute-graph .react-flow__node {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .attribute-graph-view {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .attribute-graph {
+    min-height: 0;
+  }
+}
